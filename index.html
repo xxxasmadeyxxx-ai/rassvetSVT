@@ -122,7 +122,7 @@
   </div>
 
   <div class="cov-box" id="covInfo">
-    <b>Зона покриття:</b> для орбіт ~500–540 км при робочому куті ≥25–30° радіус плями становить ~700–750 км; до горизонту (0°) — ~2300–2500 км.
+    <b>Зона покриття:</b> для орбіт ~500–540 км при робочому куті ≥25–30° радіус плями становить ~700–900 км; до горизонту (0°) — ~2300–2500 км.
   </div>
 
   <div class="controls">
@@ -187,12 +187,13 @@
     document.getElementById("bannerCity").textContent = state.city;
 
     function coverageRadiusKm(altKm, minElDeg) {
-      const elRad = satellite.degreesToRadians(Math.max(0, minElDeg));
       const rE = EARTH_R_KM;
-      const rS = rE + Math.max(0, altKm);
-      const ratio = Math.min(1, (rE / rS) * Math.cos(elRad));
-      const centralAngle = Math.max(0, Math.acos(ratio) - elRad);
-      return rE * centralAngle;
+      const rS = rE + Math.max(100, altKm);
+      const elRad = satellite.degreesToRadians(Math.max(0, Math.min(89, minElDeg)));
+      const sinGamma = Math.min(1, (rE / rS) * Math.cos(elRad));
+      const gamma = Math.asin(sinGamma);
+      const psi = Math.max(0, (Math.PI / 2) - elRad - gamma);
+      return rE * psi;
     }
 
     function haversineKm(lat1Deg, lon1Deg, lat2Deg, lon2Deg) {
@@ -331,8 +332,6 @@
       };
 
       const passes = [];
-      let sampleWorkR = 720;
-      let sampleHorR = 2400;
 
       for (const { name, satrec } of entries) {
         let inPass = false;
@@ -366,8 +365,6 @@
               peakAltKm = geo.height;
               peakArcKm = haversineKm(state.lat, state.lon, subLat, subLon);
               peakWorkR = coverageRadiusKm(peakAltKm, state.workEl);
-              sampleWorkR = peakWorkR;
-              sampleHorR = coverageRadiusKm(peakAltKm, 0);
             }
           } else if (inPass) {
             passes.push({
@@ -378,6 +375,7 @@
               max_az: +maxAzDeg.toFixed(0),
               arc_km: Math.round(peakArcKm),
               work_r_km: Math.round(peakWorkR),
+              alt_km: Math.round(peakAltKm),
               in_zone: maxElDeg >= state.workEl,
               sats: [name]
             });
@@ -393,6 +391,7 @@
             max_az: +maxAzDeg.toFixed(0),
             arc_km: Math.round(peakArcKm),
             work_r_km: Math.round(peakWorkR),
+            alt_km: Math.round(peakAltKm),
             in_zone: maxElDeg >= state.workEl,
             sats: [name]
           });
@@ -402,9 +401,15 @@
       passes.sort((a, b) => a.startMs - b.startMs);
       state.rawPasses = passes;
 
+      const avgAlt = passes.length
+        ? passes.reduce((s, p) => s + (p.alt_km || 520), 0) / passes.length
+        : 520;
+      const workR = coverageRadiusKm(avgAlt, state.workEl);
+      const horR = coverageRadiusKm(avgAlt, 0);
+
       document.getElementById("covInfo").innerHTML =
-        `<b>Зона покриття (${state.city}):</b> робочий поріг ≥${state.workEl}° → радіус плями ~<b>${Math.round(sampleWorkR)} км</b>; ` +
-        `геометричний горизонт (0°) → ~<b>${Math.round(sampleHorR)} км</b>.`;
+        `<b>Зона покриття (${state.city}):</b> робочий поріг ≥${state.workEl}° → радіус плями ~<b>${Math.round(workR)} км</b>; ` +
+        `геометричний горизонт (0°) → ~<b>${Math.round(horR)} км</b>.`;
 
       render();
     }

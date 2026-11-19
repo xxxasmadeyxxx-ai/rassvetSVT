@@ -270,7 +270,8 @@
             ? lines[i - 1]
             : `SAT-${lines[i].slice(2, 7).trim()}`;
           if (!flt || name.toUpperCase().includes(flt)) {
-            entries.push({ name, satrec: satellite.twoline2satrec(lines[i], lines[i + 1]) });
+            const satrec = satellite.twoline2satrec(lines[i], lines[i + 1]);
+            entries.push({ name, satrec });
           }
           i += 1;
         }
@@ -322,8 +323,8 @@
       const now = Date.now();
       const startMs = now;
       const endMs = now + state.days * 86400 * 1000;
-      const stepSec = 10;
-      const minElRad = satellite.degreesToRadians(Math.max(0, state.minEl));
+      const stepMs = 15 * 1000;
+      const minElDeg = Math.max(0, state.minEl);
 
       const observerGd = {
         latitude: satellite.degreesToRadians(state.lat),
@@ -333,34 +334,40 @@
 
       const passes = [];
 
-      function savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm) {
-        if (pEnd <= pStart) return;
-        const durMs = pEnd - pStart;
-        const finalStart = durMs > 25 * 60 * 1000 ? Math.max(pStart, pEnd - 10 * 60 * 1000) : pStart;
-        passes.push({
-          sat: name,
-          startMs: finalStart,
-          endMs: pEnd,
-          max_el: +maxElDeg.toFixed(1),
-          max_az: +maxAzDeg.toFixed(0),
-          arc_km: Math.round(peakArcKm),
-          work_r_km: Math.round(peakWorkR),
-          alt_km: Math.round(peakAltKm),
-          in_zone: maxElDeg >= state.workEl,
-          sats: [name]
-        });
-      }
-
       for (const { name, satrec } of entries) {
-        let inPass = false;
-        let pStart = 0, pEnd = 0, maxElDeg = 0, maxAzDeg = 0;
-        let peakArcKm = 0, peakWorkR = 0, peakAltKm = 520;
-        let prevElDeg = -999;
+        if (!satrec || (typeof satrec.error === "number" && satrec.error !== 0)) continue;
 
-        for (let t = startMs; t <= endMs; t += stepSec * 1000) {
+        let inPass = false;
+        let pStart = 0;
+        let pEnd = 0;
+        let maxElDeg = -90;
+        let maxAzDeg = 0;
+        let peakArcKm = 0;
+        let peakWorkR = 0;
+        let peakAltKm = 520;
+
+        for (let t = startMs; t <= endMs; t += stepMs) {
           const d = new Date(t);
           const pv = satellite.propagate(satrec, d);
-          if (!pv || !pv.position || typeof pv.position.x !== "number") continue;
+          if (!pv || !pv.position || typeof pv.position.x !== "number" || !Number.isFinite(pv.position.x)) {
+            if (inPass && pEnd > pStart) {
+              passes.push({
+                sat: name,
+                startMs: pStart,
+                endMs: pEnd,
+                max_el: +maxElDeg.toFixed(1),
+                max_az: +maxAzDeg.toFixed(0),
+                arc_km: Math.round(peakArcKm),
+                work_r_km: Math.round(peakWorkR),
+                alt_km: Math.round(peakAltKm),
+                in_zone: maxElDeg >= state.workEl,
+                sats: [name]
+              });
+              inPass = false;
+              maxElDeg = -90;
+            }
+            continue;
+          }
 
           const gmst = satellite.gstime(d);
           const ecf = satellite.eciToEcf(pv.position, gmst);
@@ -370,22 +377,14 @@
 
           if (!Number.isFinite(elDeg)) continue;
 
-          if (look.elevation >= minElRad) {
-            if (inPass && (t - pStart) > 45 * 60 * 1000 && elDeg > prevElDeg + 0.5 && prevElDeg < maxElDeg - 2) {
-              savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
-              inPass = false;
-              maxElDeg = 0;
-            }
-
+          if (elDeg >= minElDeg) {
             if (!inPass) {
               inPass = true;
               pStart = t;
-              pEnd = t;
               maxElDeg = elDeg;
               maxAzDeg = azDeg;
-            } else {
-              pEnd = t;
             }
+            pEnd = t;
 
             if (elDeg >= maxElDeg) {
               maxElDeg = elDeg;
@@ -394,21 +393,43 @@
               const subLat = satellite.radiansToDegrees(geo.latitude);
               const subLon = satellite.radiansToDegrees(geo.longitude);
               const rawAlt = geo.height;
-              peakAltKm = (typeof rawAlt === "number" && rawAlt > 150 && rawAlt < 2000) ? rawAlt : 520;
+              peakAltKm = (typeof rawAlt === "number" && rawAlt > 150 && rawAlt < 2500) ? rawAlt : 520;
               peakArcKm = haversineKm(state.lat, state.lon, subLat, subLon);
               peakWorkR = coverageRadiusKm(peakAltKm, state.workEl);
             }
           } else if (inPass) {
-            savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
+            if (pEnd > pStart) {
+              passes.push({
+                sat: name,
+                startMs: pStart,
+                endMs: pEnd,
+                max_el: +maxElDeg.toFixed(1),
+                max_az: +maxAzDeg.toFixed(0),
+                arc_km: Math.round(peakArcKm),
+                work_r_km: Math.round(peakWorkR),
+                alt_km: Math.round(peakAltKm),
+                in_zone: maxElDeg >= state.workEl,
+                sats: [name]
+              });
+            }
             inPass = false;
-            maxElDeg = 0;
+            maxElDeg = -90;
           }
-
-          prevElDeg = elDeg;
         }
 
-        if (inPass) {
-          savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
+        if (inPass && pEnd > pStart) {
+          passes.push({
+            sat: name,
+            startMs: pStart,
+            endMs: pEnd,
+            max_el: +maxElDeg.toFixed(1),
+            max_az: +maxAzDeg.toFixed(0),
+            arc_km: Math.round(peakArcKm),
+            work_r_km: Math.round(peakWorkR),
+            alt_km: Math.round(peakAltKm),
+            in_zone: maxElDeg >= state.workEl,
+            sats: [name]
+          });
         }
       }
 
@@ -416,7 +437,7 @@
       state.rawPasses = passes;
 
       const avgAlt = passes.length
-        ? passes.reduce((s, p) => s + ((p.alt_km > 150 && p.alt_km < 2000) ? p.alt_km : 520), 0) / passes.length
+        ? passes.reduce((s, p) => s + ((p.alt_km > 150 && p.alt_km < 2500) ? p.alt_km : 520), 0) / passes.length
         : 520;
       const workR = coverageRadiusKm(avgAlt, state.workEl);
       const horR = coverageRadiusKm(avgAlt, 0);

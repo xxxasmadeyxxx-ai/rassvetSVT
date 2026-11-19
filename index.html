@@ -260,39 +260,6 @@
       render();
     }
 
-    function normalizeTleLine1(line) {
-      if (line.length === 69) return line;
-      const p = line.trim().split(/\s+/);
-      if (p.length < 9) return line;
-      const satCls = p[1].padEnd(6, " ").slice(0, 6);
-      const intl = p[2].padEnd(8, " ").slice(0, 8);
-      const epoch = p[3].padStart(14, " ").slice(-14);
-      const ndot = p[4].padStart(10, " ").slice(-10);
-      const nddot = p[5].padStart(8, " ").slice(-8);
-      const bstar = p[6].padStart(8, " ").slice(-8);
-      const ephType = p[7].slice(0, 1);
-      const elChk = p[8].padStart(5, " ").slice(-5);
-      return `1 ${satCls} ${intl} ${epoch} ${ndot} ${nddot} ${bstar} ${ephType} ${elChk}`;
-    }
-
-    function normalizeTleLine2(line) {
-      if (line.length === 69) return line;
-      const p = line.trim().split(/\s+/);
-      if (p.length < 8) return line;
-      const satnum = p[1].padStart(5, " ").slice(-5);
-      const incl = p[2].padStart(8, " ").slice(-8);
-      const raan = p[3].padStart(8, " ").slice(-8);
-      const ecc = p[4].padStart(7, "0").slice(-7);
-      const argp = p[5].padStart(8, " ").slice(-8);
-      const ma = p[6].padStart(8, " ").slice(-8);
-      const tail = p.slice(7).join("");
-      const mmMatch = tail.match(/^(\d+\.\d+)/);
-      const mmStr = mmMatch ? mmMatch[1] : tail.slice(0, 11);
-      const mm = mmStr.padStart(11, " ").slice(-11);
-      const revChk = tail.slice(mmStr.length).padStart(6, " ").slice(-6);
-      return `2 ${satnum} ${incl} ${raan} ${ecc} ${argp} ${ma} ${mm}${revChk}`;
-    }
-
     function parseTleEntries(text, filterStr) {
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       const entries = [];
@@ -303,9 +270,7 @@
             ? lines[i - 1]
             : `SAT-${lines[i].slice(2, 7).trim()}`;
           if (!flt || name.toUpperCase().includes(flt)) {
-            const l1 = normalizeTleLine1(lines[i]);
-            const l2 = normalizeTleLine2(lines[i + 1]);
-            entries.push({ name, satrec: satellite.twoline2satrec(l1, l2) });
+            entries.push({ name, satrec: satellite.twoline2satrec(lines[i], lines[i + 1]) });
           }
           i += 1;
         }
@@ -371,8 +336,6 @@
       function savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm) {
         if (pEnd <= pStart) return;
         const durMs = pEnd - pStart;
-        // Real LEO pass (~500-550 km) above minEl lasts ~4-12 min.
-        // If a single continuous segment is unrealistically long (> 25 min), cap around peak window
         const finalStart = durMs > 25 * 60 * 1000 ? Math.max(pStart, pEnd - 10 * 60 * 1000) : pStart;
         passes.push({
           sat: name,
@@ -408,8 +371,6 @@
           if (!Number.isFinite(elDeg)) continue;
 
           if (look.elevation >= minElRad) {
-            // If elevation was already falling after a peak and then rises again after a valley (> 20 min later),
-            // split into separate orbital passes so consecutive orbits never merge into one multi-hour pass.
             if (inPass && (t - pStart) > 45 * 60 * 1000 && elDeg > prevElDeg + 0.5 && prevElDeg < maxElDeg - 2) {
               savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
               inPass = false;

@@ -322,7 +322,7 @@
       const now = Date.now();
       const startMs = now;
       const endMs = now + state.days * 86400 * 1000;
-      const stepSec = 20;
+      const stepSec = 10;
       const minElRad = satellite.degreesToRadians(Math.max(0, state.minEl));
 
       const observerGd = {
@@ -333,10 +333,29 @@
 
       const passes = [];
 
+      function savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm) {
+        if (pEnd <= pStart) return;
+        const durMs = pEnd - pStart;
+        const finalStart = durMs > 25 * 60 * 1000 ? Math.max(pStart, pEnd - 10 * 60 * 1000) : pStart;
+        passes.push({
+          sat: name,
+          startMs: finalStart,
+          endMs: pEnd,
+          max_el: +maxElDeg.toFixed(1),
+          max_az: +maxAzDeg.toFixed(0),
+          arc_km: Math.round(peakArcKm),
+          work_r_km: Math.round(peakWorkR),
+          alt_km: Math.round(peakAltKm),
+          in_zone: maxElDeg >= state.workEl,
+          sats: [name]
+        });
+      }
+
       for (const { name, satrec } of entries) {
         let inPass = false;
         let pStart = 0, pEnd = 0, maxElDeg = 0, maxAzDeg = 0;
         let peakArcKm = 0, peakWorkR = 0, peakAltKm = 520;
+        let prevElDeg = -999;
 
         for (let t = startMs; t <= endMs; t += stepSec * 1000) {
           const d = new Date(t);
@@ -349,7 +368,15 @@
           const elDeg = satellite.radiansToDegrees(look.elevation);
           const azDeg = satellite.radiansToDegrees(look.azimuth);
 
-          if (Number.isFinite(elDeg) && look.elevation >= minElRad) {
+          if (!Number.isFinite(elDeg)) continue;
+
+          if (look.elevation >= minElRad) {
+            if (inPass && (t - pStart) > 45 * 60 * 1000 && elDeg > prevElDeg + 0.5 && prevElDeg < maxElDeg - 2) {
+              savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
+              inPass = false;
+              maxElDeg = 0;
+            }
+
             if (!inPass) {
               inPass = true;
               pStart = t;
@@ -372,36 +399,16 @@
               peakWorkR = coverageRadiusKm(peakAltKm, state.workEl);
             }
           } else if (inPass) {
-            passes.push({
-              sat: name,
-              startMs: pStart,
-              endMs: pEnd,
-              max_el: +maxElDeg.toFixed(1),
-              max_az: +maxAzDeg.toFixed(0),
-              arc_km: Math.round(peakArcKm),
-              work_r_km: Math.round(peakWorkR),
-              alt_km: Math.round(peakAltKm),
-              in_zone: maxElDeg >= state.workEl,
-              sats: [name]
-            });
+            savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
             inPass = false;
             maxElDeg = 0;
           }
+
+          prevElDeg = elDeg;
         }
 
         if (inPass) {
-          passes.push({
-            sat: name,
-            startMs: pStart,
-            endMs: pEnd,
-            max_el: +maxElDeg.toFixed(1),
-            max_az: +maxAzDeg.toFixed(0),
-            arc_km: Math.round(peakArcKm),
-            work_r_km: Math.round(peakWorkR),
-            alt_km: Math.round(peakAltKm),
-            in_zone: maxElDeg >= state.workEl,
-            sats: [name]
-          });
+          savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
         }
       }
 

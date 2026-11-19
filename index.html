@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b111a" />
+  <title>rassvet watch · Севастополь</title>
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b111a;
+      --card: #131c29;
+      --border: #1e2a3b;
+      --accent: #f5b027;
+      --accent-text: #0b111a;
+      --text: #e6edf3;
+      --muted: #8b9bb4;
+      --red: #ef4444;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --blue: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    body { background: var(--bg); color: var(--text); max-width: 580px; margin: 0 auto; padding: 14px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap; }
+    .logo { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .dot-live { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .btn-icon { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .btn-icon:hover { border-color: var(--accent); }
+
+    .status-banner { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin: 14px 0; }
+    .status-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+    .city-name { color: var(--blue); font-weight: 700; font-size: 17px; }
+    .state-now { color: var(--red); font-weight: 800; font-size: 18px; letter-spacing: 0.5px; }
+    .state-wait { color: var(--yellow); font-weight: 700; font-size: 16px; }
+    .sub-info { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.45; }
+
+    .cov-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .cov-box b { color: var(--text); }
+
+    .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .seg-group { display: inline-flex; background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg-btn { background: transparent; border: none; color: var(--muted); padding: 6px 11px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .seg-btn.active { background: var(--accent); color: var(--accent-text); }
+
+    .summary-bar { display: flex; gap: 14px; font-size: 13px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; }
+    .b-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+    .day-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+    .day-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; cursor: pointer; user-select: none; }
+    .day-title { font-weight: 700; font-size: 14px; }
+    .day-title.today { color: var(--accent); }
+    .day-meta { color: var(--muted); font-size: 13px; }
+    .day-list { border-top: 1px solid var(--border); padding: 6px 14px; display: none; }
+    .day-card.open .day-list { display: block; }
+    .win-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; gap: 8px; }
+    .win-row:last-child { border-bottom: none; }
+    .win-left { display: flex; align-items: center; gap: 8px; }
+    .win-right { color: var(--muted); text-align: right; font-size: 12px; line-height: 1.35; }
+    .tag-in { color: var(--green); font-weight: 700; }
+    .tag-edge { color: var(--yellow); font-weight: 700; }
+    .tag-near { color: var(--muted); font-weight: 700; }
+
+    .panel { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; gap: 8px; flex-direction: column; }
+    .panel.show { display: flex; }
+    .panel input, .panel select, .panel textarea {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      padding: 7px 10px; border-radius: 6px; font-size: 13px; width: 100%;
+    }
+    .panel textarea { min-height: 110px; font-size: 11px; resize: vertical; }
+    .hint { font-size: 12px; color: var(--muted); line-height: 1.35; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo"><span class="dot-live"></span> rassvet watch</div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <button class="btn-icon" onclick="togglePanel('tlePanel')">?? TLE</button>
+      <button class="btn-icon" onclick="togglePanel('locPanel')">? Зона / Точка</button>
+    </div>
+  </header>
+
+  <div class="panel" id="tlePanel">
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <button class="seg-btn active" style="border-radius:6px;" onclick="fetchCelesTrak()">Завантажити з CelesTrak</button>
+      <label class="btn-icon" style="cursor:pointer;">
+        ?? Файл .tle
+        <input type="file" accept=".tle,.txt" style="display:none;" onchange="loadTleFile(event)" />
+      </label>
+      <button class="seg-btn" style="border-radius:6px; background:#1e2a3b; color:#e6edf3;" onclick="applyTleText()">Застосувати текст</button>
+    </div>
+    <input type="text" id="filterInput" value="RASSVET-3" placeholder="Фільтр назви (наприклад RASSVET-3)" />
+    <textarea id="tleTextarea" placeholder="Вставте TLE (3-рядковий або 2-рядковий формат) та натисніть «Застосувати текст»..."></textarea>
+    <div class="hint" id="tleStatus">Очікування TLE-даних. Завантажте з CelesTrak, оберіть .tle файл або вставте TLE вручну.</div>
+  </div>
+
+  <div class="panel" id="locPanel">
+    <select id="presetCity" onchange="applyPreset()">
+      <option value="44.6166,33.5254,Севастополь" selected>Севастополь (44.62, 33.53)</option>
+      <option value="49.5883,34.5514,Полтава">Полтава (49.59, 34.55)</option>
+      <option value="50.4501,30.5234,Київ">Київ (50.45, 30.52)</option>
+      <option value="46.4825,30.7233,Одеса">Одеса (46.48, 30.72)</option>
+    </select>
+    <div style="display:flex; gap:6px;">
+      <input type="text" id="cityInput" placeholder="Місто" />
+      <input type="number" id="latInput" step="0.0001" placeholder="Широта" />
+      <input type="number" id="lonInput" step="0.0001" placeholder="Довгота" />
+    </div>
+    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+      <span style="font-size:12px; color:var(--muted);">Пошук від (°):</span>
+      <input type="number" id="minElInput" min="0" max="60" style="width:65px" />
+      <span style="font-size:12px; color:var(--muted);">Робоча зона від (°):</span>
+      <input type="number" id="workElInput" min="5" max="75" style="width:65px" />
+      <button class="seg-btn active" style="border-radius:6px; margin-left:auto;" onclick="saveLocation()">Зберегти</button>
+    </div>
+  </div>
+
+  <div class="status-banner" id="statusBanner">
+    <span class="city-name" id="bannerCity">Севастополь</span> — завантажте TLE через кнопку <b>?? TLE</b> для розрахунку розкладу та зони покриття.
+  </div>
+
+  <div class="cov-box" id="covInfo">
+    <b>Зона покриття:</b> для орбіт ~500–540 км при робочому куті ?25–30° радіус плями становить ~700–750 км; до горизонту (0°) — ~2300–2500 км.
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <div id="totalInfo" style="font-weight:700; font-size:14px;">—</div>
+      <div class="seg-group" id="daysGroup">
+        <button class="seg-btn" data-days="1" onclick="setDays(1)">+1 дн</button>
+        <button class="seg-btn active" data-days="3" onclick="setDays(3)">+3 дн</button>
+        <button class="seg-btn" data-days="7" onclick="setDays(7)">+7 дн</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="seg-group" id="modeGroup">
+        <button class="seg-btn active" data-mode="windows" onclick="setMode('windows')">Вікна</button>
+        <button class="seg-btn" data-mode="passes" onclick="setMode('passes')">Прольоти</button>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted);" id="gapWrapper">
+        <span>розрив ?</span>
+        <div class="seg-group" id="gapGroup">
+          <button class="seg-btn" data-gap="0" onclick="setGap(0)">0</button>
+          <button class="seg-btn active" data-gap="2" onclick="setGap(2)">2</button>
+          <button class="seg-btn" data-gap="5" onclick="setGap(5)">5</button>
+          <button class="seg-btn" data-gap="10" onclick="setGap(10)">10</button>
+        </div>
+        <span>хв</span>
+      </div>
+    </div>
+
+    <div class="summary-bar" id="summaryBar"></div>
+  </div>
+
+  <div id="scheduleContainer"></div>
+
+  <script>
+    const CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+    const EARTH_R_KM = 6371.0;
+
+    let state = {
+      city: localStorage.getItem("rw2_city") || "Севастополь",
+      lat: parseFloat(localStorage.getItem("rw2_lat")) || 44.6166,
+      lon: parseFloat(localStorage.getItem("rw2_lon")) || 33.5254,
+      minEl: parseFloat(localStorage.getItem("rw2_min_el")) || 5,
+      workEl: parseFloat(localStorage.getItem("rw2_work_el")) || 25,
+      filter: localStorage.getItem("rw2_filter") || "RASSVET-3",
+      days: 3,
+      mode: "windows",
+      gapMin: 2,
+      tleText: localStorage.getItem("rw2_tle") || "",
+      rawPasses: [],
+      matchedCount: 0
+    };
+
+    document.getElementById("cityInput").value = state.city;
+    document.getElementById("latInput").value = state.lat;
+    document.getElementById("lonInput").value = state.lon;
+    document.getElementById("minElInput").value = state.minEl;
+    document.getElementById("workElInput").value = state.workEl;
+    document.getElementById("filterInput").value = state.filter;
+    document.getElementById("tleTextarea").value = state.tleText;
+    document.getElementById("bannerCity").textContent = state.city;
+
+    function coverageRadiusKm(altKm, minElDeg) {
+      const elRad = satellite.degreesToRadians(Math.max(0, minElDeg));
+      const rE = EARTH_R_KM;
+      const rS = rE + Math.max(0, altKm);
+      const ratio = Math.min(1, (rE / rS) * Math.cos(elRad));
+      const centralAngle = Math.max(0, Math.acos(ratio) - elRad);
+      return rE * centralAngle;
+    }
+
+    function haversineKm(lat1Deg, lon1Deg, lat2Deg, lon2Deg) {
+      const dLat = satellite.degreesToRadians(lat2Deg - lat1Deg);
+      const dLon = satellite.degreesToRadians(lon2Deg - lon1Deg);
+      const rLat1 = satellite.degreesToRadians(lat1Deg);
+      const rLat2 = satellite.degreesToRadians(lat2Deg);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) ** 2;
+      return EARTH_R_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+    }
+
+    function zoneTag(maxElDeg) {
+      if (maxElDeg >= state.workEl) return `<span class="tag-in">В ЗОНІ</span>`;
+      if (maxElDeg >= 15) return `<span class="tag-edge">КРАЙ</span>`;
+      return `<span class="tag-near">ПОВЗ</span>`;
+    }
+
+    function togglePanel(id) {
+      const el = document.getElementById(id);
+      const willShow = !el.classList.contains("show");
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("show"));
+      if (willShow) el.classList.add("show");
+    }
+
+    function applyPreset() {
+      const [lat, lon, city] = document.getElementById("presetCity").value.split(",");
+      document.getElementById("cityInput").value = city;
+      document.getElementById("latInput").value = lat;
+      document.getElementById("lonInput").value = lon;
+    }
+
+    function saveLocation() {
+      state.city = document.getElementById("cityInput").value.trim() || "Севастополь";
+      state.lat = parseFloat(document.getElementById("latInput").value);
+      state.lon = parseFloat(document.getElementById("lonInput").value);
+      state.minEl = parseFloat(document.getElementById("minElInput").value) || 0;
+      state.workEl = parseFloat(document.getElementById("workElInput").value) || 25;
+      localStorage.setItem("rw2_city", state.city);
+      localStorage.setItem("rw2_lat", state.lat);
+      localStorage.setItem("rw2_lon", state.lon);
+      localStorage.setItem("rw2_min_el", state.minEl);
+      localStorage.setItem("rw2_work_el", state.workEl);
+      document.getElementById("bannerCity").textContent = state.city;
+      togglePanel("locPanel");
+      recomputePasses();
+    }
+
+    function setDays(d) {
+      state.days = d;
+      document.querySelectorAll("#daysGroup .seg-btn").forEach(b => b.classList.toggle("active", +b.dataset.days === d));
+      recomputePasses();
+    }
+
+    function setMode(m) {
+      state.mode = m;
+      document.querySelectorAll("#modeGroup .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
+      document.getElementById("gapWrapper").style.visibility = m === "windows" ? "visible" : "hidden";
+      render();
+    }
+
+    function setGap(g) {
+      state.gapMin = g;
+      document.querySelectorAll("#gapGroup .seg-btn").forEach(b => b.classList.toggle("active", +b.dataset.gap === g));
+      render();
+    }
+
+    function parseTleEntries(text, filterStr) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const entries = [];
+      const flt = (filterStr || "").trim().toUpperCase();
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("1 ") && i + 1 < lines.length && lines[i + 1].startsWith("2 ")) {
+          const name = (i > 0 && !lines[i - 1].startsWith("1 ") && !lines[i - 1].startsWith("2 "))
+            ? lines[i - 1]
+            : `SAT-${lines[i].slice(2, 7).trim()}`;
+          if (!flt || name.toUpperCase().includes(flt)) {
+            entries.push({ name, satrec: satellite.twoline2satrec(lines[i], lines[i + 1]) });
+          }
+          i += 1;
+        }
+      }
+      return entries;
+    }
+
+    async function fetchCelesTrak() {
+      const statusEl = document.getElementById("tleStatus");
+      statusEl.textContent = "Завантаження з CelesTrak...";
+      try {
+        const res = await fetch(CELESTRAK_URL);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        document.getElementById("tleTextarea").value = await res.text();
+        applyTleText();
+      } catch (err) {
+        statusEl.textContent = "Браузер заблокував прямий запит (CORS) або немає мережі. Завантажте .tle файл або вставте TLE вручну.";
+      }
+    }
+
+    function loadTleFile(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.getElementById("tleTextarea").value = reader.result;
+        applyTleText();
+      };
+      reader.readAsText(file);
+    }
+
+    function applyTleText() {
+      state.tleText = document.getElementById("tleTextarea").value;
+      state.filter = document.getElementById("filterInput").value.trim();
+      localStorage.setItem("rw2_tle", state.tleText);
+      localStorage.setItem("rw2_filter", state.filter);
+      recomputePasses();
+      togglePanel("tlePanel");
+    }
+
+    function recomputePasses() {
+      const statusEl = document.getElementById("tleStatus");
+      if (!state.tleText.trim() || typeof satellite === "undefined") return;
+
+      const entries = parseTleEntries(state.tleText, state.filter);
+      state.matchedCount = entries.length;
+      statusEl.textContent = `Апаратів у вибірці (${state.filter || "УСІ"}): ${entries.length}`;
+
+      const now = new Date();
+      const startMs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0).getTime();
+      const endMs = now.getTime() + state.days * 86400 * 1000;
+      const stepSec = 20;
+      const minElRad = satellite.degreesToRadians(state.minEl);
+
+      const observerGd = {
+        latitude: satellite.degreesToRadians(state.lat),
+        longitude: satellite.degreesToRadians(state.lon),
+        height: 0.05
+      };
+
+      const passes = [];
+      let sampleWorkR = 720;
+      let sampleHorR = 2400;
+
+      for (const { name, satrec } of entries) {
+        let inPass = false;
+        let pStart = 0, pEnd = 0, maxElDeg = 0, maxAzDeg = 0;
+        let peakArcKm = 0, peakWorkR = 0, peakAltKm = 520;
+
+        for (let t = startMs; t <= endMs; t += stepSec * 1000) {
+          const d = new Date(t);
+          const pv = satellite.propagate(satrec, d);
+          if (!pv.position) continue;
+          const gmst = satellite.gstime(d);
+          const ecf = satellite.eciToEcf(pv.position, gmst);
+          const look = satellite.ecfToLookAngles(observerGd, ecf);
+          const elDeg = satellite.radiansToDegrees(look.elevation);
+          const azDeg = satellite.radiansToDegrees(look.azimuth);
+
+          if (look.elevation >= minElRad) {
+            if (!inPass) {
+              inPass = true;
+              pStart = t;
+              maxElDeg = elDeg;
+              maxAzDeg = azDeg;
+            }
+            pEnd = t;
+            if (elDeg >= maxElDeg) {
+              maxElDeg = elDeg;
+              maxAzDeg = azDeg;
+              const geo = satellite.eciToGeodetic(pv.position, gmst);
+              const subLat = satellite.radiansToDegrees(geo.latitude);
+              const subLon = satellite.radiansToDegrees(geo.longitude);
+              peakAltKm = geo.height;
+              peakArcKm = haversineKm(state.lat, state.lon, subLat, subLon);
+              peakWorkR = coverageRadiusKm(peakAltKm, state.workEl);
+              sampleWorkR = peakWorkR;
+              sampleHorR = coverageRadiusKm(peakAltKm, 0);
+            }
+          } else if (inPass) {
+            passes.push({
+              sat: name,
+              startMs: pStart,
+              endMs: pEnd,
+              max_el: +maxElDeg.toFixed(1),
+              max_az: +maxAzDeg.toFixed(0),
+              arc_km: Math.round(peakArcKm),
+              work_r_km: Math.round(peakWorkR),
+              in_zone: maxElDeg >= state.workEl,
+              sats: [name]
+            });
+            inPass = false;
+          }
+        }
+        if (inPass) {
+          passes.push({
+            sat: name,
+            startMs: pStart,
+            endMs: pEnd,
+            max_el: +maxElDeg.toFixed(1),
+            max_az: +maxAzDeg.toFixed(0),
+            arc_km: Math.round(peakArcKm),
+            work_r_km: Math.round(peakWorkR),
+            in_zone: maxElDeg >= state.workEl,
+            sats: [name]
+          });
+        }
+      }
+
+      passes.sort((a, b) => a.startMs - b.startMs);
+      state.rawPasses = passes;
+
+      document.getElementById("covInfo").innerHTML =
+        `<b>Зона покриття (${state.city}):</b> робочий поріг ?${state.workEl}° > радіус плями ~<b>${Math.round(sampleWorkR)} км</b>; ` +
+        `геометричний горизонт (0°) > ~<b>${Math.round(sampleHorR)} км</b>.`;
+
+      render();
+    }
+
+    function computeItems() {
+      if (state.mode === "passes" || state.rawPasses.length === 0) return state.rawPasses;
+      const gapMs = state.gapMin * 60 * 1000;
+      const wins = [];
+      let cur = {
+        ...state.rawPasses[0],
+        sats: [...state.rawPasses[0].sats],
+        minArcKm: state.rawPasses[0].arc_km,
+        inZoneCount: state.rawPasses[0].in_zone ? 1 : 0
+      };
+      for (let i = 1; i < state.rawPasses.length; i++) {
+        const p = state.rawPasses[i];
+        if (p.startMs - cur.endMs <= gapMs) {
+          cur.endMs = Math.max(cur.endMs, p.endMs);
+          cur.max_el = Math.max(cur.max_el, p.max_el);
+          cur.minArcKm = Math.min(cur.minArcKm, p.arc_km);
+          cur.sats.push(p.sat);
+          if (p.in_zone) cur.inZoneCount++;
+        } else {
+          wins.push(cur);
+          cur = { ...p, sats: [...p.sats], minArcKm: p.arc_km, inZoneCount: p.in_zone ? 1 : 0 };
+        }
+      }
+      wins.push(cur);
+      return wins;
+    }
+
+    function fmtTime(ms) {
+      return new Date(ms).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function fmtDurSec(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m} хв ${String(s).padStart(2, "0")} с`;
+    }
+
+    function fmtDurHM(sec) {
+      const totalM = Math.floor(sec / 60);
+      const h = Math.floor(totalM / 60);
+      const m = totalM % 60;
+      return `${h} год ${String(m).padStart(2, "0")} хв`;
+    }
+
+    function render() {
+      const now = Date.now();
+      const items = computeItems();
+      const label = state.mode === "windows" ? "вікон" : "прольотів";
+
+      let past = 0, activeItem = null, upcoming = 0, nextItem = null;
+      for (const it of items) {
+        if (it.endMs < now) past++;
+        else if (it.startMs <= now && now <= it.endMs) activeItem = it;
+        else {
+          upcoming++;
+          if (!nextItem) nextItem = it;
+        }
+      }
+
+      const banner = document.getElementById("statusBanner");
+      if (!state.tleText.trim()) {
+        banner.innerHTML = `<span class="city-name">${state.city}</span> — завантажте TLE через кнопку <b>?? TLE</b> для розрахунку розкладу та зони покриття.`;
+      } else if (activeItem) {
+        const leftSec = (activeItem.endMs - now) / 1000;
+        banner.innerHTML = `
+          <div class="status-top">
+            <div><span class="city-name">${state.city}</span> <span class="state-now">ЗАРАЗ</span></div>
+            <div style="font-size:13px; color:var(--muted);">до ${fmtTime(activeItem.endMs)} · макс. ${activeItem.max_el}°</div>
+          </div>
+          <div class="sub-info">Залишилось: <b>${fmtDurSec(leftSec)}</b> · ${zoneTag(activeItem.max_el)}</div>
+        `;
+      } else if (nextItem) {
+        const waitSec = (nextItem.startMs - now) / 1000;
+        banner.innerHTML = `
+          <div class="status-top">
+            <div><span class="city-name">${state.city}</span> <span class="state-wait">ОЧІКУВАННЯ</span></div>
+            <div style="font-size:13px; color:var(--muted);">початок о ${fmtTime(nextItem.startMs)} · макс. ${nextItem.max_el}°</div>
+          </div>
+          <div class="sub-info">До наступного: <b>${fmtDurHM(waitSec)}</b> · ${zoneTag(nextItem.max_el)}</div>
+        `;
+      } else {
+        banner.innerHTML = `<span class="city-name">${state.city}</span> — проходів за поточними параметрами немає`;
+      }
+
+      document.getElementById("totalInfo").textContent = `${state.city} · ${items.length} ${label}`;
+      document.getElementById("summaryBar").innerHTML = `
+        <span class="badge"><i class="b-dot" style="background:var(--red)"></i> минулі ${past}</span>
+        <span class="badge"><i class="b-dot" style="background:var(--green)"></i> зараз ${activeItem ? 1 : 0}</span>
+        <span class="badge"><i class="b-dot" style="background:var(--yellow)"></i> майбутні ${upcoming}</span>
+      `;
+
+      const groups = new Map();
+      const todayStr = new Date(now).toLocaleDateString("uk-UA");
+      for (const it of items) {
+        const d = new Date(it.startMs);
+        const key = d.toLocaleDateString("uk-UA");
+        if (!groups.has(key)) groups.set(key, { dateObj: d, list: [] });
+        groups.get(key).list.push(it);
+      }
+
+      const container = document.getElementById("scheduleContainer");
+      container.innerHTML = "";
+      for (const [key, grp] of groups.entries()) {
+        const isToday = key === todayStr;
+        const dayTotalSec = grp.list.reduce((acc, x) => acc + (x.endMs - x.startMs) / 1000, 0);
+        const dayName = grp.dateObj.toLocaleDateString("uk-UA", { weekday: "short", day: "numeric", month: "short" });
+        const prefix = isToday ? "Сьогодні · " : "";
+
+        const card = document.createElement("div");
+        card.className = "day-card" + (isToday ? " open" : "");
+        card.innerHTML = `
+          <div class="day-header" onclick="this.parentElement.classList.toggle('open')">
+            <span class="day-title ${isToday ? 'today' : ''}">${prefix}${dayName}</span>
+            <span class="day-meta">${grp.list.length} ${label} · ${fmtDurHM(dayTotalSec)}</span>
+          </div>
+          <div class="day-list">
+            ${grp.list.map(it => {
+              const color = it.endMs < now ? "var(--red)" : (it.startMs <= now ? "var(--green)" : "var(--yellow)");
+              const dur = (it.endMs - it.startMs) / 1000;
+              const info = state.mode === "windows"
+                ? `${fmtDurSec(dur)} · ${it.sats.length} пр. (в зоні: ${it.inZoneCount}) · ${it.max_el}° · дуга ~${it.minArcKm} км`
+                : `${it.sat} · ${zoneTag(it.max_el)} · ${it.max_el}° (Az ${it.max_az}°) · дуга ~${it.arc_km} км`;
+              return `
+                <div class="win-row">
+                  <div class="win-left">
+                    <i class="b-dot" style="background:${color}"></i>
+                    <span>${fmtTime(it.startMs)} - ${fmtTime(it.endMs)}</span>
+                  </div>
+                  <div class="win-right">${info}</div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    if (state.tleText.trim()) recomputePasses();
+    else render();
+    setInterval(render, 1000);
+  </script>
+</body>
+</html>

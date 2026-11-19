@@ -311,6 +311,7 @@
       togglePanel("tlePanel");
     }
 
+    // Чистий розрахунок проходів (AOS -> TCA -> LOS) без багів склеювання
     function recomputePasses() {
       const statusEl = document.getElementById("tleStatus");
       if (!state.tleText.trim() || typeof satellite === "undefined") return;
@@ -320,104 +321,113 @@
       statusEl.textContent = `Апаратів у вибірці (${state.filter || "УСІ"}): ${entries.length}`;
 
       const now = Date.now();
-      const startMs = now;
+      // Починаємо трохи раніше (на 30 хв), щоб зловити поточний активний проліт, якщо він вже йде
+      const startMs = now - 30 * 60 * 1000;
       const endMs = now + state.days * 86400 * 1000;
-      const stepSec = 10;
-      const minElRad = satellite.degreesToRadians(Math.max(0, state.minEl));
+      const stepMs = 15 * 1000; // Крок 15 секунд — оптимально для точного часу та швидкодії
+      const minElDeg = Math.max(0, state.minEl);
 
       const observerGd = {
         latitude: satellite.degreesToRadians(state.lat),
         longitude: satellite.degreesToRadians(state.lon),
-        height: 0.05
+        height: 0.05 // 50 метрів над рівнем моря у км
       };
 
       const passes = [];
 
-      function savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm) {
-        if (pEnd <= pStart) return;
-        const durMs = pEnd - pStart;
-        const finalStart = durMs > 25 * 60 * 1000 ? Math.max(pStart, pEnd - 10 * 60 * 1000) : pStart;
-        passes.push({
-          sat: name,
-          startMs: finalStart,
-          endMs: pEnd,
-          max_el: +maxElDeg.toFixed(1),
-          max_az: +maxAzDeg.toFixed(0),
-          arc_km: Math.round(peakArcKm),
-          work_r_km: Math.round(peakWorkR),
-          alt_km: Math.round(peakAltKm),
-          in_zone: maxElDeg >= state.workEl,
-          sats: [name]
-        });
-      }
-
       for (const { name, satrec } of entries) {
         let inPass = false;
-        let pStart = 0, pEnd = 0, maxElDeg = 0, maxAzDeg = 0;
-        let peakArcKm = 0, peakWorkR = 0, peakAltKm = 520;
-        let prevElDeg = -999;
+        let pStart = 0;
+        let pEnd = 0;
+        let maxEl = -90;
+        let maxAz = 0;
+        let peakArcKm = 0;
+        let peakWorkR = 0;
+        let peakAltKm = 520;
 
-        for (let t = startMs; t <= endMs; t += stepSec * 1000) {
+        for (let t = startMs; t <= endMs; t += stepMs) {
           const d = new Date(t);
           const pv = satellite.propagate(satrec, d);
-          if (!pv || !pv.position || typeof pv.position.x !== "number") continue;
+          if (!pv || !pv.position) continue;
 
           const gmst = satellite.gstime(d);
           const ecf = satellite.eciToEcf(pv.position, gmst);
           const look = satellite.ecfToLookAngles(observerGd, ecf);
+          
           const elDeg = satellite.radiansToDegrees(look.elevation);
           const azDeg = satellite.radiansToDegrees(look.azimuth);
 
           if (!Number.isFinite(elDeg)) continue;
 
-          if (look.elevation >= minElRad) {
-            if (inPass && (t - pStart) > 45 * 60 * 1000 && elDeg > prevElDeg + 0.5 && prevElDeg < maxElDeg - 2) {
-              savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
-              inPass = false;
-              maxElDeg = 0;
-            }
-
+          if (elDeg >= minElDeg) {
             if (!inPass) {
               inPass = true;
               pStart = t;
-              pEnd = t;
-              maxElDeg = elDeg;
-              maxAzDeg = azDeg;
-            } else {
-              pEnd = t;
+              maxEl = elDeg;
+              maxAz = azDeg;
             }
+            pEnd = t;
 
-            if (elDeg >= maxElDeg) {
-              maxElDeg = elDeg;
-              maxAzDeg = azDeg;
+            // Фіксуємо параметри в точці найвищої кульмінації (TCA)
+            if (elDeg >= maxEl) {
+              maxEl = elDeg;
+              maxAz = azDeg;
               const geo = satellite.eciToGeodetic(pv.position, gmst);
               const subLat = satellite.radiansToDegrees(geo.latitude);
               const subLon = satellite.radiansToDegrees(geo.longitude);
               const rawAlt = geo.height;
-              peakAltKm = (typeof rawAlt === "number" && rawAlt > 150 && rawAlt < 2000) ? rawAlt : 520;
+              peakAltKm = (typeof rawAlt === "number" && rawAlt > 150 && rawAlt < 2500) ? rawAlt : 520;
               peakArcKm = haversineKm(state.lat, state.lon, subLat, subLon);
               peakWorkR = coverageRadiusKm(peakAltKm, state.workEl);
             }
-          } else if (inPass) {
-            savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
-            inPass = false;
-            maxElDeg = 0;
+          } else {
+            if (inPass) {
+              // Закриваємо прохід як тільки висота впала нижче minElDeg
+              if (pEnd > pStart) {
+                passes.push({
+                  sat: name,
+                  startMs: pStart,
+                  endMs: pEnd,
+                  max_el: +maxEl.toFixed(1),
+                  max_az: +maxAz.toFixed(0),
+                  arc_km: Math.round(peakArcKm),
+                  work_r_km: Math.round(peakWorkR),
+                  alt_km: Math.round(peakAltKm),
+                  in_zone: maxEl >= state.workEl,
+                  sats: [name]
+                });
+              }
+              inPass = false;
+              maxEl = -90;
+            }
           }
-
-          prevElDeg = elDeg;
         }
 
-        if (inPass) {
-          savePass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
+        // Якщо прохід триває на момент закінчення розрахункового періоду
+        if (inPass && pEnd > pStart) {
+          passes.push({
+            sat: name,
+            startMs: pStart,
+            endMs: pEnd,
+            max_el: +maxEl.toFixed(1),
+            max_az: +maxAz.toFixed(0),
+            arc_km: Math.round(peakArcKm),
+            work_r_km: Math.round(peakWorkR),
+            alt_km: Math.round(peakAltKm),
+            in_zone: maxEl >= state.workEl,
+            sats: [name]
+          });
         }
       }
 
-      passes.sort((a, b) => a.startMs - b.startMs);
-      state.rawPasses = passes;
+      // Відфільтровуємо ті, що вже повністю закінчилися до поточного моменту
+      state.rawPasses = passes
+        .filter(p => p.endMs >= now)
+        .sort((a, b) => a.startMs - b.startMs);
 
-      const avgAlt = passes.length
-        ? passes.reduce((s, p) => s + ((p.alt_km > 150 && p.alt_km < 2000) ? p.alt_km : 520), 0) / passes.length
-        : 520;
+      const avgAlt = state.rawPasses.length
+        ? state.rawPasses.reduce((s, p) => s + p.alt_km, 0) / state.rawPasses.length
+        : 517;
       const workR = coverageRadiusKm(avgAlt, state.workEl);
       const horR = coverageRadiusKm(avgAlt, 0);
 

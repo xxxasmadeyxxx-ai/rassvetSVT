@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
@@ -37,6 +37,13 @@
 
     .cov-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: var(--muted); line-height: 1.45; }
     .cov-box b { color: var(--text); }
+
+    .diag-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .diag-box b { color: var(--text); }
+    .diag-box .warn { color: var(--yellow); }
+    .diag-box .err { color: var(--red); }
+    .diag-box ul { margin: 6px 0 0 16px; padding: 0; }
+    .diag-box li { margin-bottom: 3px; }
 
     .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -91,7 +98,7 @@
       </label>
       <button class="seg-btn" style="border-radius:6px; background:#1e2a3b; color:#e6edf3;" onclick="applyTleText()">Застосувати текст</button>
     </div>
-    <input type="text" id="filterInput" value="RASSVET-3" placeholder="Фільтр назви (наприклад RASSVET-3)" />
+    <input type="text" id="filterInput" value="RASSVET" placeholder="Фільтр назви (наприклад RASSVET або RASSVET-3)" />
     <textarea id="tleTextarea" placeholder="Вставте TLE (3-рядковий або 2-рядковий формат) та натисніть «Застосувати текст»..."></textarea>
     <div class="hint" id="tleStatus">Очікування TLE-даних. Завантажте з CelesTrak, оберіть .tle файл або вставте TLE вручну.</div>
   </div>
@@ -115,6 +122,7 @@
       <input type="number" id="workElInput" min="5" max="75" style="width:65px" />
       <button class="seg-btn active" style="border-radius:6px; margin-left:auto;" onclick="saveLocation()">Зберегти</button>
     </div>
+    <div class="hint">Поріг «Пошук від» = 0° показує всі прольоти над горизонтом. Якщо хочете бачити лише помітні — поставте 5–10°.</div>
   </div>
 
   <div class="status-banner" id="statusBanner">
@@ -123,6 +131,10 @@
 
   <div class="cov-box" id="covInfo">
     <b>Зона покриття:</b> для орбіт ~500–540 км при робочому куті ≥25–30° радіус плями становить ~700–900 км; до горизонту (0°) — ~2300–2500 км.
+  </div>
+
+  <div class="diag-box" id="diagBox">
+    <b>Діагностика:</b> TLE ще не завантажено.
   </div>
 
   <div class="controls">
@@ -166,15 +178,19 @@
       city: localStorage.getItem("rw2_city") || "Севастополь",
       lat: parseFloat(localStorage.getItem("rw2_lat")) || 44.6166,
       lon: parseFloat(localStorage.getItem("rw2_lon")) || 33.5254,
-      minEl: parseFloat(localStorage.getItem("rw2_min_el")) || 5,
+      minEl: (localStorage.getItem("rw2_min_el") !== null ? parseFloat(localStorage.getItem("rw2_min_el")) : 0),
       workEl: parseFloat(localStorage.getItem("rw2_work_el")) || 25,
-      filter: localStorage.getItem("rw2_filter") || "RASSVET-3",
+      filter: localStorage.getItem("rw2_filter") || "RASSVET",
       days: 3,
       mode: "windows",
       gapMin: 2,
       tleText: localStorage.getItem("rw2_tle") || "",
       rawPasses: [],
-      matchedCount: 0
+      matchedCount: 0,
+      matchedNames: [],
+      calcStartMs: 0,
+      calcEndMs: 0,
+      calcDurationMs: 0
     };
 
     document.getElementById("cityInput").value = state.city;
@@ -229,8 +245,10 @@
       state.city = document.getElementById("cityInput").value.trim() || "Севастополь";
       state.lat = parseFloat(document.getElementById("latInput").value);
       state.lon = parseFloat(document.getElementById("lonInput").value);
-      state.minEl = parseFloat(document.getElementById("minElInput").value) || 0;
-      state.workEl = parseFloat(document.getElementById("workElInput").value) || 25;
+      const minElVal = parseFloat(document.getElementById("minElInput").value);
+      state.minEl = Number.isFinite(minElVal) ? Math.max(0, minElVal) : 0;
+      const workElVal = parseFloat(document.getElementById("workElInput").value);
+      state.workEl = Number.isFinite(workElVal) ? Math.max(5, workElVal) : 25;
       localStorage.setItem("rw2_city", state.city);
       localStorage.setItem("rw2_lat", state.lat);
       localStorage.setItem("rw2_lon", state.lon);
@@ -270,7 +288,12 @@
             ? lines[i - 1]
             : `SAT-${lines[i].slice(2, 7).trim()}`;
           if (!flt || name.toUpperCase().includes(flt)) {
-            entries.push({ name, satrec: satellite.twoline2satrec(lines[i], lines[i + 1]) });
+            try {
+              const satrec = satellite.twoline2satrec(lines[i], lines[i + 1]);
+              if (satrec && (typeof satrec.error !== "number" || satrec.error === 0)) {
+                entries.push({ name, satrec });
+              }
+            } catch (e) { /* пропускаємо битий TLE */ }
           }
           i += 1;
         }
@@ -282,7 +305,10 @@
       const statusEl = document.getElementById("tleStatus");
       statusEl.textContent = "Завантаження з CelesTrak...";
       try {
-        const res = await fetch(CELESTRAK_URL);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const res = await fetch(CELESTRAK_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!res.ok) throw new Error("HTTP " + res.status);
         document.getElementById("tleTextarea").value = await res.text();
         applyTleText();
@@ -313,17 +339,35 @@
 
     function recomputePasses() {
       const statusEl = document.getElementById("tleStatus");
-      if (!state.tleText.trim() || typeof satellite === "undefined") return;
+      const diagEl = document.getElementById("diagBox");
+
+      if (!state.tleText.trim() || typeof satellite === "undefined") {
+        diagEl.innerHTML = `<b>Діагностика:</b> TLE порожній або бібліотека satellite.js не завантажилась.`;
+        return;
+      }
 
       const entries = parseTleEntries(state.tleText, state.filter);
       state.matchedCount = entries.length;
-      statusEl.textContent = `Апаратів у вибірці (${state.filter || "УСІ"}): ${entries.length}`;
+      state.matchedNames = entries.map(e => e.name);
 
-      const now = Date.now();
-      const startMs = now;
-      const endMs = now + state.days * 86400 * 1000;
-      const stepMs = 15 * 1000;
+      if (entries.length === 0) {
+        statusEl.innerHTML = `⚠️ Не знайдено супутників за фільтром "<b>${state.filter}</b>". Спробуйте коротший фільтр (наприклад, просто <b>RASSVET</b>).`;
+        diagEl.innerHTML = `<b>Діагностика:</b> <span class="err">0 супутників зматчилось</span> за фільтром "<b>${state.filter}</b>".<br>Порада: фільтр шукає підрядок у назві. Спробуйте <b>RASSVET</b> замість <b>RASSVET-3</b>.`;
+        state.rawPasses = [];
+        state.matchedCount = 0;
+        document.getElementById("totalInfo").textContent = `${state.city} · 0 прольотів`;
+        render();
+        return;
+      }
+
+      // Починаємо з початку ПОТОЧНОЇ доби (локальний час), а не з "зараз".
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const startMs = startOfDay.getTime();
+      const endMs = startMs + state.days * 86400 * 1000;
+      const stepMs = 10 * 1000;
       const minElDeg = Math.max(0, state.minEl);
+      const t0 = performance.now();
 
       const observerGd = {
         latitude: satellite.degreesToRadians(state.lat),
@@ -334,7 +378,6 @@
       const passes = [];
 
       for (const { name, satrec } of entries) {
-        if (!satrec) continue;
         let inPass = false;
         let pStart = 0;
         let pEnd = 0;
@@ -350,16 +393,10 @@
           if (!pv || !pv.position || typeof pv.position.x !== "number" || !Number.isFinite(pv.position.x)) {
             if (inPass && pEnd > pStart) {
               passes.push({
-                sat: name,
-                startMs: pStart,
-                endMs: pEnd,
-                max_el: +maxElDeg.toFixed(1),
-                max_az: +maxAzDeg.toFixed(0),
-                arc_km: Math.round(peakArcKm),
-                work_r_km: Math.round(peakWorkR),
-                alt_km: Math.round(peakAltKm),
-                in_zone: maxElDeg >= state.workEl,
-                sats: [name]
+                sat: name, startMs: pStart, endMs: pEnd,
+                max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
+                arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
+                alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
               });
               inPass = false;
               maxElDeg = -90;
@@ -398,16 +435,10 @@
           } else if (inPass) {
             if (pEnd > pStart) {
               passes.push({
-                sat: name,
-                startMs: pStart,
-                endMs: pEnd,
-                max_el: +maxElDeg.toFixed(1),
-                max_az: +maxAzDeg.toFixed(0),
-                arc_km: Math.round(peakArcKm),
-                work_r_km: Math.round(peakWorkR),
-                alt_km: Math.round(peakAltKm),
-                in_zone: maxElDeg >= state.workEl,
-                sats: [name]
+                sat: name, startMs: pStart, endMs: pEnd,
+                max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
+                arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
+                alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
               });
             }
             inPass = false;
@@ -417,22 +448,38 @@
 
         if (inPass && pEnd > pStart) {
           passes.push({
-            sat: name,
-            startMs: pStart,
-            endMs: pEnd,
-            max_el: +maxElDeg.toFixed(1),
-            max_az: +maxAzDeg.toFixed(0),
-            arc_km: Math.round(peakArcKm),
-            work_r_km: Math.round(peakWorkR),
-            alt_km: Math.round(peakAltKm),
-            in_zone: maxElDeg >= state.workEl,
-            sats: [name]
+            sat: name, startMs: pStart, endMs: pEnd,
+            max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
+            arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
+            alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
           });
         }
       }
 
       passes.sort((a, b) => a.startMs - b.startMs);
       state.rawPasses = passes;
+      state.calcStartMs = startMs;
+      state.calcEndMs = endMs;
+      state.calcDurationMs = performance.now() - t0;
+
+      // Діагностика
+      const perSat = {};
+      for (const p of passes) perSat[p.sat] = (perSat[p.sat] || 0) + 1;
+      const perSatList = Object.entries(perSat)
+        .sort((a, b) => b[1] - a[1])
+        .map(([n, c]) => `<li>${n}: <b>${c}</b></li>`)
+        .join("");
+
+      const rangeStr = `${new Date(startMs).toLocaleString("uk-UA", {day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"})} → ${new Date(endMs).toLocaleString("uk-UA", {day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"})}`;
+
+      diagEl.innerHTML = `
+        <b>Діагностика:</b> зматчилось <b>${entries.length}</b> супутників, знайдено <b>${passes.length}</b> прольотів за ${state.days} дн.<br>
+        <span style="color:var(--muted)">Період: ${rangeStr} · поріг ≥${minElDeg}° · крок ${stepMs/1000}с · ${Math.round(state.calcDurationMs)} мс</span>
+        ${passes.length === 0 ? '<br><span class="warn">Жодного прольоту. Перевірте координати, поріг елевації або свіжість TLE.</span>' : ''}
+        <ul>${perSatList}</ul>
+      `;
+
+      statusEl.innerHTML = `✅ Знайдено <b>${entries.length}</b> супутників, <b>${passes.length}</b> прольотів.`;
 
       const avgAlt = passes.length
         ? passes.reduce((s, p) => s + ((p.alt_km > 150 && p.alt_km < 2500) ? p.alt_km : 520), 0) / passes.length
@@ -453,7 +500,7 @@
       const wins = [];
       let cur = {
         ...state.rawPasses[0],
-        sats: [...state.rawPasses[0].sats],
+        sats: [state.rawPasses[0].sat],
         minArcKm: state.rawPasses[0].arc_km,
         inZoneCount: state.rawPasses[0].in_zone ? 1 : 0
       };
@@ -461,13 +508,23 @@
         const p = state.rawPasses[i];
         if (p.startMs - cur.endMs <= gapMs) {
           cur.endMs = Math.max(cur.endMs, p.endMs);
-          cur.max_el = Math.max(cur.max_el, p.max_el);
+          // Зберігаємо дані ПІКОВОГО прольоту (за max_el)
+          if (p.max_el > cur.max_el) {
+            cur.max_el = p.max_el;
+            cur.max_az = p.max_az;
+            cur.alt_km = p.alt_km;
+            cur.arc_km = p.arc_km;
+            cur.work_r_km = p.work_r_km;
+          }
           cur.minArcKm = Math.min(cur.minArcKm, p.arc_km);
           cur.sats.push(p.sat);
           if (p.in_zone) cur.inZoneCount++;
         } else {
           wins.push(cur);
-          cur = { ...p, sats: [...p.sats], minArcKm: p.arc_km, inZoneCount: p.in_zone ? 1 : 0 };
+          cur = {
+            ...p, sats: [p.sat], minArcKm: p.arc_km,
+            inZoneCount: p.in_zone ? 1 : 0
+          };
         }
       }
       wins.push(cur);
@@ -479,12 +536,14 @@
     }
 
     function fmtDurSec(sec) {
+      if (sec < 0) sec = 0;
       const m = Math.floor(sec / 60);
       const s = Math.floor(sec % 60);
       return `${m} хв ${String(s).padStart(2, "0")} с`;
     }
 
     function fmtDurHM(sec) {
+      if (sec < 0) sec = 0;
       const totalM = Math.floor(sec / 60);
       const h = Math.floor(totalM / 60);
       const m = totalM % 60;
@@ -539,10 +598,10 @@
       `;
 
       const groups = new Map();
-      const todayStr = new Date(now).toLocaleDateString("uk-UA");
+      const todayKey = new Date(now).toISOString().slice(0, 10);
       for (const it of items) {
         const d = new Date(it.startMs);
-        const key = d.toLocaleDateString("uk-UA");
+        const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
         if (!groups.has(key)) groups.set(key, { dateObj: d, list: [] });
         groups.get(key).list.push(it);
       }
@@ -550,7 +609,7 @@
       const container = document.getElementById("scheduleContainer");
       container.innerHTML = "";
       for (const [key, grp] of groups.entries()) {
-        const isToday = key === todayStr;
+        const isToday = key === todayKey;
         const dayTotalSec = grp.list.reduce((acc, x) => acc + (x.endMs - x.startMs) / 1000, 0);
         const dayName = grp.dateObj.toLocaleDateString("uk-UA", { weekday: "short", day: "numeric", month: "short" });
         const prefix = isToday ? "Сьогодні · " : "";

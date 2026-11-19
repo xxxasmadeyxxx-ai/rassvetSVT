@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0b111a" />
   <title>rassvet watch · Севастополь</title>
-  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+  <!-- ЗМІНЕНО ВЕРСІЮ БІБЛІОТЕКИ НА СТАБІЛЬНУ 4.1.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@4.1.4/dist/satellite.min.js"></script>
   <style>
     :root {
       --bg: #0b111a;
@@ -123,7 +124,7 @@
       <input type="number" id="workElInput" min="5" max="75" style="width:65px" />
       <button class="seg-btn active" style="border-radius:6px; margin-left:auto;" onclick="saveLocation()">Зберегти</button>
     </div>
-    <div class="hint">Поріг «Пошук від» = 0° показує всі прольоти над горизонтом. Якщо хочете бачити лише помітні — поставте 5–10°.</div>
+    <div class="hint">Поріг «Пошук від» = 0° показує всі прольоти над горизонтом.</div>
   </div>
 
   <div class="status-banner" id="statusBanner">
@@ -174,6 +175,8 @@
   <script>
     const CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
     const EARTH_R_KM = 6371.0;
+    // Максимальна тривалість одного прольоту (у хвилинах). Якщо більше - це баг розрахунку.
+    const MAX_PASS_MINUTES = 30; 
 
     let state = {
       city: localStorage.getItem("rw2_city") || "Севастополь",
@@ -357,7 +360,7 @@
       state.matchedCount = entries.length;
 
       if (entries.length === 0) {
-        statusEl.innerHTML = `⚠️ Не знайдено супутників за фільтром "<b>${state.filter}</b>". Спробуйте коротший фільтр (наприклад, просто <b>RASSVET</b>).`;
+        statusEl.innerHTML = `⚠️ Не знайдено супутників за фільтром "<b>${state.filter}</b>".`;
         diagEl.innerHTML = `<b>Діагностика:</b> <span class="err">0 супутників зматчилось</span> за фільтром "<b>${state.filter}</b>".`;
         state.rawPasses = [];
         document.getElementById("totalInfo").textContent = `${state.city} · 0 прольотів`;
@@ -365,12 +368,11 @@
         return;
       }
 
-      // Починаємо з початку ПОТОЧНОЇ доби (00:00), а не з моменту відкриття
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const startMs = startOfDay.getTime();
       const endMs = startMs + state.days * 86400 * 1000;
-      const stepMs = 10 * 1000; // крок 10 секунд
+      const stepMs = 10 * 1000;
       const minElDeg = Math.max(0, state.minEl);
       const t0 = performance.now();
 
@@ -381,6 +383,7 @@
       };
 
       const passes = [];
+      let errorCount = 0;
 
       for (const { name, satrec } of entries) {
         let inPass = false;
@@ -395,17 +398,22 @@
         for (let t = startMs; t <= endMs; t += stepMs) {
           const d = new Date(t);
           const pv = satellite.propagate(satrec, d);
+          
           if (!pv || !pv.position || typeof pv.position.x !== "number" || !Number.isFinite(pv.position.x)) {
             if (inPass && pEnd > pStart) {
-              passes.push({
-                sat: name, startMs: pStart, endMs: pEnd,
-                max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
-                arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
-                alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
-              });
+              // Запобіжник від занадто довгих прольотів
+              if ((pEnd - pStart) / 60000 <= MAX_PASS_MINUTES) {
+                passes.push({
+                  sat: name, startMs: pStart, endMs: pEnd,
+                  max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
+                  arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
+                  alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
+                });
+              }
               inPass = false;
               maxElDeg = -90;
             }
+            errorCount++;
             continue;
           }
 
@@ -439,12 +447,15 @@
             }
           } else if (inPass) {
             if (pEnd > pStart) {
-              passes.push({
-                sat: name, startMs: pStart, endMs: pEnd,
-                max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
-                arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
-                alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
-              });
+              // Запобіжник від занадто довгих прольотів
+              if ((pEnd - pStart) / 60000 <= MAX_PASS_MINUTES) {
+                passes.push({
+                  sat: name, startMs: pStart, endMs: pEnd,
+                  max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
+                  arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
+                  alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
+                });
+              }
             }
             inPass = false;
             maxElDeg = -90;
@@ -452,12 +463,14 @@
         }
 
         if (inPass && pEnd > pStart) {
-          passes.push({
-            sat: name, startMs: pStart, endMs: pEnd,
-            max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
-            arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
-            alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
-          });
+          if ((pEnd - pStart) / 60000 <= MAX_PASS_MINUTES) {
+            passes.push({
+              sat: name, startMs: pStart, endMs: pEnd,
+              max_el: +maxElDeg.toFixed(1), max_az: +maxAzDeg.toFixed(0),
+              arc_km: Math.round(peakArcKm), work_r_km: Math.round(peakWorkR),
+              alt_km: Math.round(peakAltKm), in_zone: maxElDeg >= state.workEl, sats: [name]
+            });
+          }
         }
       }
 
@@ -539,117 +552,4 @@
     }
 
     function fmtDurSec(sec) {
-      if (sec < 0) sec = 0;
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60);
-      return `${m} хв ${String(s).padStart(2, "0")} с`;
-    }
-
-    function fmtDurHM(sec) {
-      if (sec < 0) sec = 0;
-      const totalM = Math.floor(sec / 60);
-      const h = Math.floor(totalM / 60);
-      const m = totalM % 60;
-      return `${h} год ${String(m).padStart(2, "0")} хв`;
-    }
-
-    function render() {
-      const now = Date.now();
-      const items = computeItems();
-      const label = state.mode === "windows" ? "вікон" : "прольотів";
-
-      let past = 0, activeItem = null, upcoming = 0, nextItem = null;
-      for (const it of items) {
-        if (it.endMs < now) past++;
-        else if (it.startMs <= now && now <= it.endMs) activeItem = it;
-        else {
-          upcoming++;
-          if (!nextItem) nextItem = it;
-        }
-      }
-
-      const banner = document.getElementById("statusBanner");
-      if (!state.tleText.trim()) {
-        banner.innerHTML = `<span class="city-name">${state.city}</span> — завантажте TLE через кнопку <b>📡 TLE</b> для розрахунку розкладу та зони покриття.`;
-      } else if (activeItem) {
-        const leftSec = (activeItem.endMs - now) / 1000;
-        banner.innerHTML = `
-          <div class="status-top">
-            <div><span class="city-name">${state.city}</span> <span class="state-now">ЗАРАЗ</span></div>
-            <div style="font-size:13px; color:var(--muted);">до ${fmtTime(activeItem.endMs)} · макс. ${activeItem.max_el}°</div>
-          </div>
-          <div class="sub-info">Залишилось: <b>${fmtDurSec(leftSec)}</b> · ${zoneTag(activeItem.max_el)}</div>
-        `;
-      } else if (nextItem) {
-        const waitSec = (nextItem.startMs - now) / 1000;
-        banner.innerHTML = `
-          <div class="status-top">
-            <div><span class="city-name">${state.city}</span> <span class="state-wait">ОЧІКУВАННЯ</span></div>
-            <div style="font-size:13px; color:var(--muted);">початок о ${fmtTime(nextItem.startMs)} · макс. ${nextItem.max_el}°</div>
-          </div>
-          <div class="sub-info">До наступного: <b>${fmtDurHM(waitSec)}</b> · ${zoneTag(nextItem.max_el)}</div>
-        `;
-      } else {
-        banner.innerHTML = `<span class="city-name">${state.city}</span> — проходів за поточними параметрами немає`;
-      }
-
-      document.getElementById("totalInfo").textContent = `${state.city} · ${items.length} ${label}`;
-      document.getElementById("summaryBar").innerHTML = `
-        <span class="badge"><i class="b-dot" style="background:var(--red)"></i> минулі ${past}</span>
-        <span class="badge"><i class="b-dot" style="background:var(--green)"></i> зараз ${activeItem ? 1 : 0}</span>
-        <span class="badge"><i class="b-dot" style="background:var(--yellow)"></i> майбутні ${upcoming}</span>
-      `;
-
-      const groups = new Map();
-      const todayKey = new Date(now).toISOString().slice(0, 10);
-      for (const it of items) {
-        const d = new Date(it.startMs);
-        const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-        if (!groups.has(key)) groups.set(key, { dateObj: d, list: [] });
-        groups.get(key).list.push(it);
-      }
-
-      const container = document.getElementById("scheduleContainer");
-      container.innerHTML = "";
-      for (const [key, grp] of groups.entries()) {
-        const isToday = key === todayKey;
-        const dayTotalSec = grp.list.reduce((acc, x) => acc + (x.endMs - x.startMs) / 1000, 0);
-        const dayName = grp.dateObj.toLocaleDateString("uk-UA", { weekday: "short", day: "numeric", month: "short" });
-        const prefix = isToday ? "Сьогодні · " : "";
-
-        const card = document.createElement("div");
-        card.className = "day-card" + (isToday ? " open" : "");
-        card.innerHTML = `
-          <div class="day-header" onclick="this.parentElement.classList.toggle('open')">
-            <span class="day-title ${isToday ? 'today' : ''}">${prefix}${dayName}</span>
-            <span class="day-meta">${grp.list.length} ${label} · ${fmtDurHM(dayTotalSec)}</span>
-          </div>
-          <div class="day-list">
-            ${grp.list.map(it => {
-              const color = it.endMs < now ? "var(--red)" : (it.startMs <= now ? "var(--green)" : "var(--yellow)");
-              const dur = (it.endMs - it.startMs) / 1000;
-              const info = state.mode === "windows"
-                ? `${fmtDurSec(dur)} · ${it.sats.length} пр. (в зоні: ${it.inZoneCount}) · ${it.max_el}° · дуга ~${it.minArcKm} км`
-                : `${it.sat} · ${zoneTag(it.max_el)} · ${it.max_el}° (Az ${it.max_az}°) · дуга ~${it.arc_km} км`;
-              return `
-                <div class="win-row">
-                  <div class="win-left">
-                    <i class="b-dot" style="background:${color}"></i>
-                    <span>${fmtTime(it.startMs)} - ${fmtTime(it.endMs)}</span>
-                  </div>
-                  <div class="win-right">${info}</div>
-                </div>
-              `;
-            }).join("")}
-          </div>
-        `;
-        container.appendChild(card);
-      }
-    }
-
-    if (state.tleText.trim()) recomputePasses();
-    else render();
-    setInterval(render, 1000);
-  </script>
-</body>
-</html>
+      if (sec

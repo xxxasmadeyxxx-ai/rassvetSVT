@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
@@ -86,6 +86,7 @@
     <div style="display:flex; gap:6px; flex-wrap:wrap;">
       <button class="btn-icon" onclick="togglePanel('tlePanel')">📡 TLE</button>
       <button class="btn-icon" onclick="togglePanel('locPanel')">⚙ Зона / Точка</button>
+      <button class="btn-icon" style="color: var(--red); border-color: var(--red);" onclick="clearAll()">🗑 Скинути</button>
     </div>
   </header>
 
@@ -179,7 +180,7 @@
       lat: parseFloat(localStorage.getItem("rw2_lat")) || 44.6166,
       lon: parseFloat(localStorage.getItem("rw2_lon")) || 33.5254,
       minEl: (localStorage.getItem("rw2_min_el") !== null ? parseFloat(localStorage.getItem("rw2_min_el")) : 0),
-      workEl: parseFloat(localStorage.getItem("rw2_work_el")) || 25,
+      workEl: parseFloat(localStorage.getItem("rw2_work_el")) || 24,
       filter: localStorage.getItem("rw2_filter") || "RASSVET",
       days: 3,
       mode: "windows",
@@ -187,7 +188,6 @@
       tleText: localStorage.getItem("rw2_tle") || "",
       rawPasses: [],
       matchedCount: 0,
-      matchedNames: [],
       calcStartMs: 0,
       calcEndMs: 0,
       calcDurationMs: 0
@@ -201,6 +201,13 @@
     document.getElementById("filterInput").value = state.filter;
     document.getElementById("tleTextarea").value = state.tleText;
     document.getElementById("bannerCity").textContent = state.city;
+
+    function clearAll() {
+      if(confirm("Скинути всі збережені налаштування та TLE?")) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
 
     function coverageRadiusKm(altKm, minElDeg) {
       const rE = EARTH_R_KM;
@@ -248,7 +255,7 @@
       const minElVal = parseFloat(document.getElementById("minElInput").value);
       state.minEl = Number.isFinite(minElVal) ? Math.max(0, minElVal) : 0;
       const workElVal = parseFloat(document.getElementById("workElInput").value);
-      state.workEl = Number.isFinite(workElVal) ? Math.max(5, workElVal) : 25;
+      state.workEl = Number.isFinite(workElVal) ? Math.max(5, workElVal) : 24;
       localStorage.setItem("rw2_city", state.city);
       localStorage.setItem("rw2_lat", state.lat);
       localStorage.setItem("rw2_lon", state.lon);
@@ -348,24 +355,22 @@
 
       const entries = parseTleEntries(state.tleText, state.filter);
       state.matchedCount = entries.length;
-      state.matchedNames = entries.map(e => e.name);
 
       if (entries.length === 0) {
         statusEl.innerHTML = `⚠️ Не знайдено супутників за фільтром "<b>${state.filter}</b>". Спробуйте коротший фільтр (наприклад, просто <b>RASSVET</b>).`;
-        diagEl.innerHTML = `<b>Діагностика:</b> <span class="err">0 супутників зматчилось</span> за фільтром "<b>${state.filter}</b>".<br>Порада: фільтр шукає підрядок у назві. Спробуйте <b>RASSVET</b> замість <b>RASSVET-3</b>.`;
+        diagEl.innerHTML = `<b>Діагностика:</b> <span class="err">0 супутників зматчилось</span> за фільтром "<b>${state.filter}</b>".`;
         state.rawPasses = [];
-        state.matchedCount = 0;
         document.getElementById("totalInfo").textContent = `${state.city} · 0 прольотів`;
         render();
         return;
       }
 
-      // Починаємо з початку ПОТОЧНОЇ доби (локальний час), а не з "зараз".
+      // Починаємо з початку ПОТОЧНОЇ доби (00:00), а не з моменту відкриття
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const startMs = startOfDay.getTime();
       const endMs = startMs + state.days * 86400 * 1000;
-      const stepMs = 10 * 1000;
+      const stepMs = 10 * 1000; // крок 10 секунд
       const minElDeg = Math.max(0, state.minEl);
       const t0 = performance.now();
 
@@ -462,7 +467,6 @@
       state.calcEndMs = endMs;
       state.calcDurationMs = performance.now() - t0;
 
-      // Діагностика
       const perSat = {};
       for (const p of passes) perSat[p.sat] = (perSat[p.sat] || 0) + 1;
       const perSatList = Object.entries(perSat)
@@ -508,7 +512,6 @@
         const p = state.rawPasses[i];
         if (p.startMs - cur.endMs <= gapMs) {
           cur.endMs = Math.max(cur.endMs, p.endMs);
-          // Зберігаємо дані ПІКОВОГО прольоту (за max_el)
           if (p.max_el > cur.max_el) {
             cur.max_el = p.max_el;
             cur.max_az = p.max_az;

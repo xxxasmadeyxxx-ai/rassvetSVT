@@ -174,7 +174,8 @@
       gapMin: 2,
       tleText: localStorage.getItem("rw2_tle") || "",
       rawPasses: [],
-      matchedCount: 0
+      matchedCount: 0,
+      openDays: new Map()
     };
 
     document.getElementById("cityInput").value = state.city;
@@ -260,41 +261,6 @@
       render();
     }
 
-    function normalizeTleLine1(line) {
-      const s = line.trim();
-      if (s.length === 69 && s[0] === "1") return s;
-      const p = s.split(/\s+/);
-      if (p.length < 9 || p[0] !== "1") return s;
-      const satCls = p[1].padEnd(6, " ").slice(0, 6);
-      const intl = p[2].padEnd(8, " ").slice(0, 8);
-      const epoch = p[3].padStart(14, " ").slice(-14);
-      const ndot = p[4].padStart(10, " ").slice(-10);
-      const nddot = p[5].padStart(8, " ").slice(-8);
-      const bstar = p[6].padStart(8, " ").slice(-8);
-      const eph = p[7].slice(0, 1);
-      const elChk = p[8].padStart(5, " ").slice(-5);
-      return `1 ${satCls} ${intl} ${epoch} ${ndot} ${nddot} ${bstar} ${eph} ${elChk}`;
-    }
-
-    function normalizeTleLine2(line) {
-      const s = line.trim();
-      if (s.length === 69 && s[0] === "2") return s;
-      const p = s.split(/\s+/);
-      if (p.length < 8 || p[0] !== "2") return s;
-      const satnum = p[1].padStart(5, " ").slice(-5);
-      const incl = p[2].padStart(8, " ").slice(-8);
-      const raan = p[3].padStart(8, " ").slice(-8);
-      const ecc = p[4].padStart(7, "0").slice(-7);
-      const argp = p[5].padStart(8, " ").slice(-8);
-      const ma = p[6].padStart(8, " ").slice(-8);
-      const tail = p.slice(7).join("");
-      const dotIdx = tail.indexOf(".");
-      const mmStr = dotIdx >= 0 ? tail.slice(0, Math.min(tail.length, dotIdx + 9)) : tail.slice(0, 11);
-      const mm = mmStr.padStart(11, " ").slice(-11);
-      const revChk = tail.slice(mmStr.length).padStart(6, " ").slice(-6);
-      return `2 ${satnum} ${incl} ${raan} ${ecc} ${argp} ${ma} ${mm}${revChk}`;
-    }
-
     function parseTleEntries(text, filterStr) {
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       const entries = [];
@@ -305,9 +271,7 @@
             ? lines[i - 1]
             : `SAT-${lines[i].slice(2, 7).trim()}`;
           if (!flt || name.toUpperCase().includes(flt)) {
-            const l1 = normalizeTleLine1(lines[i]);
-            const l2 = normalizeTleLine2(lines[i + 1]);
-            entries.push({ name, satrec: satellite.twoline2satrec(l1, l2) });
+            entries.push({ name, satrec: satellite.twoline2satrec(lines[i], lines[i + 1]) });
           }
           i += 1;
         }
@@ -371,8 +335,7 @@
       const passes = [];
 
       for (const { name, satrec } of entries) {
-        if (!satrec || (typeof satrec.error === "number" && satrec.error !== 0)) continue;
-
+        if (!satrec) continue;
         let inPass = false;
         let pStart = 0;
         let pEnd = 0;
@@ -529,6 +492,12 @@
       return `${h} год ${String(m).padStart(2, "0")} хв`;
     }
 
+    function toggleDay(key, cardEl) {
+      const nextOpen = !cardEl.classList.contains("open");
+      state.openDays.set(key, nextOpen);
+      cardEl.classList.toggle("open", nextOpen);
+    }
+
     function render() {
       const now = Date.now();
       const items = computeItems();
@@ -589,14 +558,16 @@
       container.innerHTML = "";
       for (const [key, grp] of groups.entries()) {
         const isToday = key === todayStr;
+        const isOpen = state.openDays.has(key) ? state.openDays.get(key) : isToday;
         const dayTotalSec = grp.list.reduce((acc, x) => acc + (x.endMs - x.startMs) / 1000, 0);
         const dayName = grp.dateObj.toLocaleDateString("uk-UA", { weekday: "short", day: "numeric", month: "short" });
         const prefix = isToday ? "Сьогодні · " : "";
 
         const card = document.createElement("div");
-        card.className = "day-card" + (isToday ? " open" : "");
+        card.className = "day-card" + (isOpen ? " open" : "");
+        card.dataset.dayKey = key;
         card.innerHTML = `
-          <div class="day-header" onclick="this.parentElement.classList.toggle('open')">
+          <div class="day-header" onclick="toggleDay('${key.replace(/'/g, "\'")}', this.parentElement)">
             <span class="day-title ${isToday ? 'today' : ''}">${prefix}${dayName}</span>
             <span class="day-meta">${grp.list.length} ${label} · ${fmtDurHM(dayTotalSec)}</span>
           </div>

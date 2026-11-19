@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
@@ -270,8 +270,7 @@
             ? lines[i - 1]
             : `SAT-${lines[i].slice(2, 7).trim()}`;
           if (!flt || name.toUpperCase().includes(flt)) {
-            const satrec = satellite.twoline2satrec(lines[i], lines[i + 1]);
-            entries.push({ name, satrec });
+            entries.push({ name, satrec: satellite.twoline2satrec(lines[i], lines[i + 1]) });
           }
           i += 1;
         }
@@ -335,8 +334,7 @@
       const passes = [];
 
       for (const { name, satrec } of entries) {
-        if (!satrec || (typeof satrec.error === "number" && satrec.error !== 0)) continue;
-
+        if (!satrec) continue;
         let inPass = false;
         let pStart = 0;
         let pEnd = 0;

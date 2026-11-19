@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+п»ї<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0b111a" />
-  <title>rassvet watch · Севастополь</title>
+  <title>rassvet watch В· РЎРµРІР°СЃС‚РѕРїРѕР»СЊ</title>
   <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
   <style>
     :root {
@@ -77,79 +77,79 @@
   <header>
     <div class="logo"><span class="dot-live"></span> rassvet watch</div>
     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-      <button class="btn-icon" onclick="togglePanel('tlePanel')">?? TLE</button>
-      <button class="btn-icon" onclick="togglePanel('locPanel')">? Зона / Точка</button>
+      <button class="btn-icon" onclick="togglePanel('tlePanel')">рџ“Ў TLE</button>
+      <button class="btn-icon" onclick="togglePanel('locPanel')">вљ™ Р—РѕРЅР° / РўРѕС‡РєР°</button>
     </div>
   </header>
 
   <div class="panel" id="tlePanel">
     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-      <button class="seg-btn active" style="border-radius:6px;" onclick="fetchCelesTrak()">Завантажити з CelesTrak</button>
+      <button class="seg-btn active" style="border-radius:6px;" onclick="fetchCelesTrak()">Р—Р°РІР°РЅС‚Р°Р¶РёС‚Рё Р· CelesTrak</button>
       <label class="btn-icon" style="cursor:pointer;">
-        ?? Файл .tle
+        рџ“Ѓ Р¤Р°Р№Р» .tle
         <input type="file" accept=".tle,.txt" style="display:none;" onchange="loadTleFile(event)" />
       </label>
-      <button class="seg-btn" style="border-radius:6px; background:#1e2a3b; color:#e6edf3;" onclick="applyTleText()">Застосувати текст</button>
+      <button class="seg-btn" style="border-radius:6px; background:#1e2a3b; color:#e6edf3;" onclick="applyTleText()">Р—Р°СЃС‚РѕСЃСѓРІР°С‚Рё С‚РµРєСЃС‚</button>
     </div>
-    <input type="text" id="filterInput" value="RASSVET-3" placeholder="Фільтр назви (наприклад RASSVET-3)" />
-    <textarea id="tleTextarea" placeholder="Вставте TLE (3-рядковий або 2-рядковий формат) та натисніть «Застосувати текст»..."></textarea>
-    <div class="hint" id="tleStatus">Очікування TLE-даних. Завантажте з CelesTrak, оберіть .tle файл або вставте TLE вручну.</div>
+    <input type="text" id="filterInput" value="RASSVET-3" placeholder="Р¤С–Р»СЊС‚СЂ РЅР°Р·РІРё (РЅР°РїСЂРёРєР»Р°Рґ RASSVET-3)" />
+    <textarea id="tleTextarea" placeholder="Р’СЃС‚Р°РІС‚Рµ TLE (3-СЂСЏРґРєРѕРІРёР№ Р°Р±Рѕ 2-СЂСЏРґРєРѕРІРёР№ С„РѕСЂРјР°С‚) С‚Р° РЅР°С‚РёСЃРЅС–С‚СЊ В«Р—Р°СЃС‚РѕСЃСѓРІР°С‚Рё С‚РµРєСЃС‚В»..."></textarea>
+    <div class="hint" id="tleStatus">РћС‡С–РєСѓРІР°РЅРЅСЏ TLE-РґР°РЅРёС…. Р—Р°РІР°РЅС‚Р°Р¶С‚Рµ Р· CelesTrak, РѕР±РµСЂС–С‚СЊ .tle С„Р°Р№Р» Р°Р±Рѕ РІСЃС‚Р°РІС‚Рµ TLE РІСЂСѓС‡РЅСѓ.</div>
   </div>
 
   <div class="panel" id="locPanel">
     <select id="presetCity" onchange="applyPreset()">
-      <option value="44.6166,33.5254,Севастополь" selected>Севастополь (44.62, 33.53)</option>
-      <option value="49.5883,34.5514,Полтава">Полтава (49.59, 34.55)</option>
-      <option value="50.4501,30.5234,Київ">Київ (50.45, 30.52)</option>
-      <option value="46.4825,30.7233,Одеса">Одеса (46.48, 30.72)</option>
+      <option value="44.6166,33.5254,РЎРµРІР°СЃС‚РѕРїРѕР»СЊ" selected>РЎРµРІР°СЃС‚РѕРїРѕР»СЊ (44.62, 33.53)</option>
+      <option value="49.5883,34.5514,РџРѕР»С‚Р°РІР°">РџРѕР»С‚Р°РІР° (49.59, 34.55)</option>
+      <option value="50.4501,30.5234,РљРёС—РІ">РљРёС—РІ (50.45, 30.52)</option>
+      <option value="46.4825,30.7233,РћРґРµСЃР°">РћРґРµСЃР° (46.48, 30.72)</option>
     </select>
     <div style="display:flex; gap:6px;">
-      <input type="text" id="cityInput" placeholder="Місто" />
-      <input type="number" id="latInput" step="0.0001" placeholder="Широта" />
-      <input type="number" id="lonInput" step="0.0001" placeholder="Довгота" />
+      <input type="text" id="cityInput" placeholder="РњС–СЃС‚Рѕ" />
+      <input type="number" id="latInput" step="0.0001" placeholder="РЁРёСЂРѕС‚Р°" />
+      <input type="number" id="lonInput" step="0.0001" placeholder="Р”РѕРІРіРѕС‚Р°" />
     </div>
     <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-      <span style="font-size:12px; color:var(--muted);">Пошук від (°):</span>
+      <span style="font-size:12px; color:var(--muted);">РџРѕС€СѓРє РІС–Рґ (В°):</span>
       <input type="number" id="minElInput" min="0" max="60" style="width:65px" />
-      <span style="font-size:12px; color:var(--muted);">Робоча зона від (°):</span>
+      <span style="font-size:12px; color:var(--muted);">Р РѕР±РѕС‡Р° Р·РѕРЅР° РІС–Рґ (В°):</span>
       <input type="number" id="workElInput" min="5" max="75" style="width:65px" />
-      <button class="seg-btn active" style="border-radius:6px; margin-left:auto;" onclick="saveLocation()">Зберегти</button>
+      <button class="seg-btn active" style="border-radius:6px; margin-left:auto;" onclick="saveLocation()">Р—Р±РµСЂРµРіС‚Рё</button>
     </div>
   </div>
 
   <div class="status-banner" id="statusBanner">
-    <span class="city-name" id="bannerCity">Севастополь</span> — завантажте TLE через кнопку <b>?? TLE</b> для розрахунку розкладу та зони покриття.
+    <span class="city-name" id="bannerCity">РЎРµРІР°СЃС‚РѕРїРѕР»СЊ</span> вЂ” Р·Р°РІР°РЅС‚Р°Р¶С‚Рµ TLE С‡РµСЂРµР· РєРЅРѕРїРєСѓ <b>рџ“Ў TLE</b> РґР»СЏ СЂРѕР·СЂР°С…СѓРЅРєСѓ СЂРѕР·РєР»Р°РґСѓ С‚Р° Р·РѕРЅРё РїРѕРєСЂРёС‚С‚СЏ.
   </div>
 
   <div class="cov-box" id="covInfo">
-    <b>Зона покриття:</b> для орбіт ~500–540 км при робочому куті ?25–30° радіус плями становить ~700–750 км; до горизонту (0°) — ~2300–2500 км.
+    <b>Р—РѕРЅР° РїРѕРєСЂРёС‚С‚СЏ:</b> РґР»СЏ РѕСЂР±С–С‚ ~500вЂ“540 РєРј РїСЂРё СЂРѕР±РѕС‡РѕРјСѓ РєСѓС‚С– в‰Ґ25вЂ“30В° СЂР°РґС–СѓСЃ РїР»СЏРјРё СЃС‚Р°РЅРѕРІРёС‚СЊ ~700вЂ“750 РєРј; РґРѕ РіРѕСЂРёР·РѕРЅС‚Сѓ (0В°) вЂ” ~2300вЂ“2500 РєРј.
   </div>
 
   <div class="controls">
     <div class="row">
-      <div id="totalInfo" style="font-weight:700; font-size:14px;">—</div>
+      <div id="totalInfo" style="font-weight:700; font-size:14px;">вЂ”</div>
       <div class="seg-group" id="daysGroup">
-        <button class="seg-btn" data-days="1" onclick="setDays(1)">+1 дн</button>
-        <button class="seg-btn active" data-days="3" onclick="setDays(3)">+3 дн</button>
-        <button class="seg-btn" data-days="7" onclick="setDays(7)">+7 дн</button>
+        <button class="seg-btn" data-days="1" onclick="setDays(1)">+1 РґРЅ</button>
+        <button class="seg-btn active" data-days="3" onclick="setDays(3)">+3 РґРЅ</button>
+        <button class="seg-btn" data-days="7" onclick="setDays(7)">+7 РґРЅ</button>
       </div>
     </div>
 
     <div class="row">
       <div class="seg-group" id="modeGroup">
-        <button class="seg-btn active" data-mode="windows" onclick="setMode('windows')">Вікна</button>
-        <button class="seg-btn" data-mode="passes" onclick="setMode('passes')">Прольоти</button>
+        <button class="seg-btn active" data-mode="windows" onclick="setMode('windows')">Р’С–РєРЅР°</button>
+        <button class="seg-btn" data-mode="passes" onclick="setMode('passes')">РџСЂРѕР»СЊРѕС‚Рё</button>
       </div>
 
       <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted);" id="gapWrapper">
-        <span>розрив ?</span>
+        <span>СЂРѕР·СЂРёРІ в‰¤</span>
         <div class="seg-group" id="gapGroup">
           <button class="seg-btn" data-gap="0" onclick="setGap(0)">0</button>
           <button class="seg-btn active" data-gap="2" onclick="setGap(2)">2</button>
           <button class="seg-btn" data-gap="5" onclick="setGap(5)">5</button>
           <button class="seg-btn" data-gap="10" onclick="setGap(10)">10</button>
         </div>
-        <span>хв</span>
+        <span>С…РІ</span>
       </div>
     </div>
 
@@ -163,7 +163,7 @@
     const EARTH_R_KM = 6371.0;
 
     let state = {
-      city: localStorage.getItem("rw2_city") || "Севастополь",
+      city: localStorage.getItem("rw2_city") || "РЎРµРІР°СЃС‚РѕРїРѕР»СЊ",
       lat: parseFloat(localStorage.getItem("rw2_lat")) || 44.6166,
       lon: parseFloat(localStorage.getItem("rw2_lon")) || 33.5254,
       minEl: parseFloat(localStorage.getItem("rw2_min_el")) || 5,
@@ -205,9 +205,9 @@
     }
 
     function zoneTag(maxElDeg) {
-      if (maxElDeg >= state.workEl) return `<span class="tag-in">В ЗОНІ</span>`;
-      if (maxElDeg >= 15) return `<span class="tag-edge">КРАЙ</span>`;
-      return `<span class="tag-near">ПОВЗ</span>`;
+      if (maxElDeg >= state.workEl) return `<span class="tag-in">Р’ Р—РћРќР†</span>`;
+      if (maxElDeg >= 15) return `<span class="tag-edge">РљР РђР™</span>`;
+      return `<span class="tag-near">РџРћР’Р—</span>`;
     }
 
     function togglePanel(id) {
@@ -225,7 +225,7 @@
     }
 
     function saveLocation() {
-      state.city = document.getElementById("cityInput").value.trim() || "Севастополь";
+      state.city = document.getElementById("cityInput").value.trim() || "РЎРµРІР°СЃС‚РѕРїРѕР»СЊ";
       state.lat = parseFloat(document.getElementById("latInput").value);
       state.lon = parseFloat(document.getElementById("lonInput").value);
       state.minEl = parseFloat(document.getElementById("minElInput").value) || 0;
@@ -279,14 +279,14 @@
 
     async function fetchCelesTrak() {
       const statusEl = document.getElementById("tleStatus");
-      statusEl.textContent = "Завантаження з CelesTrak...";
+      statusEl.textContent = "Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ Р· CelesTrak...";
       try {
         const res = await fetch(CELESTRAK_URL);
         if (!res.ok) throw new Error("HTTP " + res.status);
         document.getElementById("tleTextarea").value = await res.text();
         applyTleText();
       } catch (err) {
-        statusEl.textContent = "Браузер заблокував прямий запит (CORS) або немає мережі. Завантажте .tle файл або вставте TLE вручну.";
+        statusEl.textContent = "Р‘СЂР°СѓР·РµСЂ Р·Р°Р±Р»РѕРєСѓРІР°РІ РїСЂСЏРјРёР№ Р·Р°РїРёС‚ (CORS) Р°Р±Рѕ РЅРµРјР°С” РјРµСЂРµР¶С–. Р—Р°РІР°РЅС‚Р°Р¶С‚Рµ .tle С„Р°Р№Р» Р°Р±Рѕ РІСЃС‚Р°РІС‚Рµ TLE РІСЂСѓС‡РЅСѓ.";
       }
     }
 
@@ -316,7 +316,7 @@
 
       const entries = parseTleEntries(state.tleText, state.filter);
       state.matchedCount = entries.length;
-      statusEl.textContent = `Апаратів у вибірці (${state.filter || "УСІ"}): ${entries.length}`;
+      statusEl.textContent = `РђРїР°СЂР°С‚С–РІ Сѓ РІРёР±С–СЂС†С– (${state.filter || "РЈРЎР†"}): ${entries.length}`;
 
       const now = new Date();
       const startMs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0).getTime();
@@ -403,8 +403,8 @@
       state.rawPasses = passes;
 
       document.getElementById("covInfo").innerHTML =
-        `<b>Зона покриття (${state.city}):</b> робочий поріг ?${state.workEl}° > радіус плями ~<b>${Math.round(sampleWorkR)} км</b>; ` +
-        `геометричний горизонт (0°) > ~<b>${Math.round(sampleHorR)} км</b>.`;
+        `<b>Р—РѕРЅР° РїРѕРєСЂРёС‚С‚СЏ (${state.city}):</b> СЂРѕР±РѕС‡РёР№ РїРѕСЂС–Рі в‰Ґ${state.workEl}В° в†’ СЂР°РґС–СѓСЃ РїР»СЏРјРё ~<b>${Math.round(sampleWorkR)} РєРј</b>; ` +
+        `РіРµРѕРјРµС‚СЂРёС‡РЅРёР№ РіРѕСЂРёР·РѕРЅС‚ (0В°) в†’ ~<b>${Math.round(sampleHorR)} РєРј</b>.`;
 
       render();
     }
@@ -443,20 +443,20 @@
     function fmtDurSec(sec) {
       const m = Math.floor(sec / 60);
       const s = Math.floor(sec % 60);
-      return `${m} хв ${String(s).padStart(2, "0")} с`;
+      return `${m} С…РІ ${String(s).padStart(2, "0")} СЃ`;
     }
 
     function fmtDurHM(sec) {
       const totalM = Math.floor(sec / 60);
       const h = Math.floor(totalM / 60);
       const m = totalM % 60;
-      return `${h} год ${String(m).padStart(2, "0")} хв`;
+      return `${h} РіРѕРґ ${String(m).padStart(2, "0")} С…РІ`;
     }
 
     function render() {
       const now = Date.now();
       const items = computeItems();
-      const label = state.mode === "windows" ? "вікон" : "прольотів";
+      const label = state.mode === "windows" ? "РІС–РєРѕРЅ" : "РїСЂРѕР»СЊРѕС‚С–РІ";
 
       let past = 0, activeItem = null, upcoming = 0, nextItem = null;
       for (const it of items) {
@@ -470,34 +470,34 @@
 
       const banner = document.getElementById("statusBanner");
       if (!state.tleText.trim()) {
-        banner.innerHTML = `<span class="city-name">${state.city}</span> — завантажте TLE через кнопку <b>?? TLE</b> для розрахунку розкладу та зони покриття.`;
+        banner.innerHTML = `<span class="city-name">${state.city}</span> вЂ” Р·Р°РІР°РЅС‚Р°Р¶С‚Рµ TLE С‡РµСЂРµР· РєРЅРѕРїРєСѓ <b>рџ“Ў TLE</b> РґР»СЏ СЂРѕР·СЂР°С…СѓРЅРєСѓ СЂРѕР·РєР»Р°РґСѓ С‚Р° Р·РѕРЅРё РїРѕРєСЂРёС‚С‚СЏ.`;
       } else if (activeItem) {
         const leftSec = (activeItem.endMs - now) / 1000;
         banner.innerHTML = `
           <div class="status-top">
-            <div><span class="city-name">${state.city}</span> <span class="state-now">ЗАРАЗ</span></div>
-            <div style="font-size:13px; color:var(--muted);">до ${fmtTime(activeItem.endMs)} · макс. ${activeItem.max_el}°</div>
+            <div><span class="city-name">${state.city}</span> <span class="state-now">Р—РђР РђР—</span></div>
+            <div style="font-size:13px; color:var(--muted);">РґРѕ ${fmtTime(activeItem.endMs)} В· РјР°РєСЃ. ${activeItem.max_el}В°</div>
           </div>
-          <div class="sub-info">Залишилось: <b>${fmtDurSec(leftSec)}</b> · ${zoneTag(activeItem.max_el)}</div>
+          <div class="sub-info">Р—Р°Р»РёС€РёР»РѕСЃСЊ: <b>${fmtDurSec(leftSec)}</b> В· ${zoneTag(activeItem.max_el)}</div>
         `;
       } else if (nextItem) {
         const waitSec = (nextItem.startMs - now) / 1000;
         banner.innerHTML = `
           <div class="status-top">
-            <div><span class="city-name">${state.city}</span> <span class="state-wait">ОЧІКУВАННЯ</span></div>
-            <div style="font-size:13px; color:var(--muted);">початок о ${fmtTime(nextItem.startMs)} · макс. ${nextItem.max_el}°</div>
+            <div><span class="city-name">${state.city}</span> <span class="state-wait">РћР§Р†РљРЈР’РђРќРќРЇ</span></div>
+            <div style="font-size:13px; color:var(--muted);">РїРѕС‡Р°С‚РѕРє Рѕ ${fmtTime(nextItem.startMs)} В· РјР°РєСЃ. ${nextItem.max_el}В°</div>
           </div>
-          <div class="sub-info">До наступного: <b>${fmtDurHM(waitSec)}</b> · ${zoneTag(nextItem.max_el)}</div>
+          <div class="sub-info">Р”Рѕ РЅР°СЃС‚СѓРїРЅРѕРіРѕ: <b>${fmtDurHM(waitSec)}</b> В· ${zoneTag(nextItem.max_el)}</div>
         `;
       } else {
-        banner.innerHTML = `<span class="city-name">${state.city}</span> — проходів за поточними параметрами немає`;
+        banner.innerHTML = `<span class="city-name">${state.city}</span> вЂ” РїСЂРѕС…РѕРґС–РІ Р·Р° РїРѕС‚РѕС‡РЅРёРјРё РїР°СЂР°РјРµС‚СЂР°РјРё РЅРµРјР°С”`;
       }
 
-      document.getElementById("totalInfo").textContent = `${state.city} · ${items.length} ${label}`;
+      document.getElementById("totalInfo").textContent = `${state.city} В· ${items.length} ${label}`;
       document.getElementById("summaryBar").innerHTML = `
-        <span class="badge"><i class="b-dot" style="background:var(--red)"></i> минулі ${past}</span>
-        <span class="badge"><i class="b-dot" style="background:var(--green)"></i> зараз ${activeItem ? 1 : 0}</span>
-        <span class="badge"><i class="b-dot" style="background:var(--yellow)"></i> майбутні ${upcoming}</span>
+        <span class="badge"><i class="b-dot" style="background:var(--red)"></i> РјРёРЅСѓР»С– ${past}</span>
+        <span class="badge"><i class="b-dot" style="background:var(--green)"></i> Р·Р°СЂР°Р· ${activeItem ? 1 : 0}</span>
+        <span class="badge"><i class="b-dot" style="background:var(--yellow)"></i> РјР°Р№Р±СѓС‚РЅС– ${upcoming}</span>
       `;
 
       const groups = new Map();
@@ -515,22 +515,22 @@
         const isToday = key === todayStr;
         const dayTotalSec = grp.list.reduce((acc, x) => acc + (x.endMs - x.startMs) / 1000, 0);
         const dayName = grp.dateObj.toLocaleDateString("uk-UA", { weekday: "short", day: "numeric", month: "short" });
-        const prefix = isToday ? "Сьогодні · " : "";
+        const prefix = isToday ? "РЎСЊРѕРіРѕРґРЅС– В· " : "";
 
         const card = document.createElement("div");
         card.className = "day-card" + (isToday ? " open" : "");
         card.innerHTML = `
           <div class="day-header" onclick="this.parentElement.classList.toggle('open')">
             <span class="day-title ${isToday ? 'today' : ''}">${prefix}${dayName}</span>
-            <span class="day-meta">${grp.list.length} ${label} · ${fmtDurHM(dayTotalSec)}</span>
+            <span class="day-meta">${grp.list.length} ${label} В· ${fmtDurHM(dayTotalSec)}</span>
           </div>
           <div class="day-list">
             ${grp.list.map(it => {
               const color = it.endMs < now ? "var(--red)" : (it.startMs <= now ? "var(--green)" : "var(--yellow)");
               const dur = (it.endMs - it.startMs) / 1000;
               const info = state.mode === "windows"
-                ? `${fmtDurSec(dur)} · ${it.sats.length} пр. (в зоні: ${it.inZoneCount}) · ${it.max_el}° · дуга ~${it.minArcKm} км`
-                : `${it.sat} · ${zoneTag(it.max_el)} · ${it.max_el}° (Az ${it.max_az}°) · дуга ~${it.arc_km} км`;
+                ? `${fmtDurSec(dur)} В· ${it.sats.length} РїСЂ. (РІ Р·РѕРЅС–: ${it.inZoneCount}) В· ${it.max_el}В° В· РґСѓРіР° ~${it.minArcKm} РєРј`
+                : `${it.sat} В· ${zoneTag(it.max_el)} В· ${it.max_el}В° (Az ${it.max_az}В°) В· РґСѓРіР° ~${it.arc_km} РєРј`;
               return `
                 <div class="win-row">
                   <div class="win-left">

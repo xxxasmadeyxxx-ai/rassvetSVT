@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
@@ -567,7 +567,7 @@
         card.className = "day-card" + (isOpen ? " open" : "");
         card.dataset.dayKey = key;
         card.innerHTML = `
-          <div class="day-header" onclick="toggleDay('${key.replace(/'/g, "\'")}', this.parentElement)">
+          <div class="day-header" onclick="toggleDay('${key.replace(/'/g, "\\'")}', this.parentElement)">
             <span class="day-title ${isToday ? 'today' : ''}">${prefix}${dayName}</span>
             <span class="day-meta">${grp.list.length} ${label} · ${fmtDurHM(dayTotalSec)}</span>
           </div>

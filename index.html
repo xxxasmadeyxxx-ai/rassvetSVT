@@ -323,8 +323,9 @@
       const startMs = now;
       const endMs = now + state.days * 86400 * 1000;
       const stepSec = 10;
-      const maxPassMs = 30 * 60 * 1000;
-      const minElRad = satellite.degreesToRadians(state.minEl);
+      const maxPassMs = 20 * 60 * 1000;
+      const minPassSec = 30;
+      const minElRad = satellite.degreesToRadians(Math.max(0, state.minEl));
 
       const observerGd = {
         latitude: satellite.degreesToRadians(state.lat),
@@ -335,7 +336,9 @@
       const passes = [];
 
       function pushCurrentPass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm) {
-        if (pEnd <= pStart) return;
+        const durSec = (pEnd - pStart) / 1000;
+        if (durSec < minPassSec) return;
+        if (durSec * 1000 > maxPassMs) return;
         passes.push({
           sat: name,
           startMs: pStart,
@@ -366,15 +369,9 @@
           const elDeg = satellite.radiansToDegrees(look.elevation);
           const azDeg = satellite.radiansToDegrees(look.azimuth);
 
-          if (look.elevation >= minElRad) {
+          if (Number.isFinite(elDeg) && look.elevation >= minElRad) {
             if (!inPass) {
               inPass = true;
-              pStart = t;
-              pEnd = t;
-              maxElDeg = elDeg;
-              maxAzDeg = azDeg;
-            } else if (t - pStart > maxPassMs) {
-              pushCurrentPass(name, pStart, pEnd, maxElDeg, maxAzDeg, peakArcKm, peakWorkR, peakAltKm);
               pStart = t;
               pEnd = t;
               maxElDeg = elDeg;
